@@ -40,6 +40,18 @@ gh api -X POST repos/hellgods1-source/tesla-tab-map/pages -f "build_type=legacy"
 ## 데이터
 
 센터 목록은 고객지원 안내 문자 2통을 병합·중복 제거한 21곳입니다.  
-좌표는 도로명 주소를 OpenStreetMap Nominatim 기준으로 넣었습니다.
+지도 핀은 Google My Maps에 `shops.csv`를 가져와 표시합니다.
 
 공식 안내: [Tesla 공인 바디샵](https://www.tesla.com/ko_kr/support/body-shop-support)
+
+## Google My Maps (21곳 핀)
+
+키 없이 구글맵에 센터를 찍으려면 공개 My Map이 한 번 필요합니다.
+
+1. [Google My Maps](https://www.google.com/mymaps)에서 새 지도를 만듭니다.
+2. 가져오기 → `shops.csv` (이름·주소·위도·경도).
+3. 공유 → **링크가 있는 모든 사용자**.
+4. 공유/삽입 URL의 `mid=` 값을 복사합니다.
+5. `index.html`의 `MY_MAPS_MID`에 넣고 다시 배포합니다.
+
+`mid`가 비어 있으면 페이지 지도 자리에 위 안내가 표시됩니다.

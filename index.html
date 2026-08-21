@@ -9,7 +9,6 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
   <style>
     :root {
       --bg: #FFFFFF;
@@ -54,15 +53,32 @@
       background: var(--bg-soft);
       position: relative;
     }
-    #map {
+    #mapFrame {
       width: 100%;
       height: 100%;
+      border: 0;
+      display: block;
     }
-    .leaflet-container { background: var(--bg-soft); font-family: inherit; height: 100%; }
-    .leaflet-div-icon {
-      background: transparent;
-      border: none;
+    .map-setup {
+      display: none;
+      position: absolute;
+      inset: 0;
+      padding: 20px 24px;
+      background: var(--bg);
+      color: var(--body);
+      overflow: auto;
+      font-size: 14px;
+      line-height: 1.5;
     }
+    .map-setup.open { display: block; }
+    .map-setup h2 {
+      margin: 0 0 8px;
+      font-size: 16px;
+      font-weight: 500;
+      color: var(--ink);
+    }
+    .map-setup ol { margin: 8px 0 0; padding-left: 1.2em; }
+    .map-setup a { color: var(--blue); }
     .list-pane {
       flex: 1 1 auto;
       min-height: 0;
@@ -306,38 +322,6 @@
       border-top: 1px solid var(--hairline);
     }
     footer.note a { color: var(--body); }
-    .pin {
-      width: 28px;
-      height: 28px;
-      border-radius: 50% 50% 50% 0;
-      transform: rotate(-45deg);
-      border: 2px solid #171A20;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-    .pin span {
-      transform: rotate(45deg);
-      color: #fff;
-      font-size: 11px;
-      font-weight: 500;
-      line-height: 1;
-    }
-    .pin.tesla { background: var(--blue); }
-    .pin.tab { background: var(--ink); }
-    .pin-wrap { width: 32px; height: 40px; }
-    .pin-wrap.selected .pin {
-      box-shadow: 0 0 0 3px #fff, 0 0 0 6px var(--blue);
-    }
-    .user-dot {
-      width: 14px;
-      height: 14px;
-      border-radius: 50%;
-      background: var(--blue);
-      border: 2px solid #fff;
-      box-shadow: 0 0 0 6px rgba(62, 106, 225, 0.28);
-    }
-    .user-dot-wrap { width: 26px; height: 26px; }
   </style>
 </head>
 <body>
@@ -363,7 +347,18 @@
     </header>
     <div class="stage">
       <div class="map-pane">
-        <div id="map" role="application" aria-label="바디샵 지도"></div>
+        <iframe id="mapFrame" title="구글 지도 — Tesla 공인 바디샵" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
+        <div id="mapSetup" class="map-setup">
+          <h2>구글맵에 센터 핀을 표시하려면 My Maps가 필요합니다</h2>
+          <p>아래를 한 번만 하면 21곳 핀이 지도에 기본 표시됩니다.</p>
+          <ol>
+            <li><a href="https://www.google.com/mymaps" target="_blank" rel="noopener">Google My Maps</a>에서 새 지도를 만듭니다.</li>
+            <li>가져오기 → <a href="shops.csv" download>shops.csv</a> (이름·주소·위도·경도).</li>
+            <li>공유 → <strong>링크가 있는 모든 사용자</strong>.</li>
+            <li>공유 또는 삽입 URL의 <code>mid=</code> 값을 복사합니다.</li>
+            <li><code>index.html</code>의 <code>MY_MAPS_MID</code>에 붙여 넣은 뒤 다시 배포합니다.</li>
+          </ol>
+        </div>
       </div>
       <section class="list-pane">
         <div class="list-meta">
@@ -391,7 +386,6 @@
     </div>
   </div>
 
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   <script>
     const SIDO_ORDER = ["서울", "경기", "인천", "강원", "대전", "대구", "광주", "부산", "경남", "제주"];
     const SIDO_LABEL = {
@@ -407,6 +401,7 @@
       "제주": "제주특별자치도"
     };
     const KOREA_BBOX = "124.5,33.0,132.0,38.9";
+    const MY_MAPS_MID = "";
 
     const SHOPS = [
       { id: "yongin", name: "Tesla 직영 사고수리센터 (용인)", area: "경기 용인", sido: "경기", type: "tesla", address: "경기 용인시 기흥구 중부대로 14", phones: ["080-617-1399", "010-9894-0237"], lat: 37.276619, lng: 127.117136 },
@@ -432,42 +427,23 @@
       { id: "cheonwoo-jeju", name: "천우 (제주)", area: "제주", sido: "제주", type: "tab", address: "제주시 연삼로 759", phones: ["064-805-5222"], lat: 33.519604, lng: 126.596332 }
     ];
 
-    const map = L.map("map", { zoomControl: true, attributionControl: true });
-    L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
-      maxZoom: 19,
-      attribution: "&copy; OpenStreetMap &copy; CARTO"
-    }).addTo(map);
-
-    const markers = {};
     let userLatLng = null;
     let selectedId = null;
-    let userMarker = null;
 
-    function pinIcon(type, selected) {
-      const label = type === "tesla" ? "직" : "공";
-      return L.divIcon({
-        className: "pin-wrap" + (selected ? " selected" : ""),
-        html: `<div class="pin ${type}"><span>${label}</span></div>`,
-        iconSize: [32, 40],
-        iconAnchor: [16, 38],
-        popupAnchor: [0, -30]
-      });
-    }
-
-    function userDotIcon() {
-      return L.divIcon({
-        className: "user-dot-wrap",
-        html: '<div class="user-dot"></div>',
-        iconSize: [26, 26],
-        iconAnchor: [13, 13]
-      });
-    }
-
-    function refreshPinSelection() {
-      SHOPS.forEach((shop) => {
-        const marker = markers[shop.id];
-        if (marker) marker.setIcon(pinIcon(shop.type, shop.id === selectedId));
-      });
+    function showMap(lat, lng, zoom) {
+      const frame = document.getElementById("mapFrame");
+      const setup = document.getElementById("mapSetup");
+      if (!MY_MAPS_MID) {
+        frame.style.display = "none";
+        setup.classList.add("open");
+        return;
+      }
+      setup.classList.remove("open");
+      frame.style.display = "block";
+      const z = zoom == null ? 7 : zoom;
+      const ll = (lat != null && lng != null) ? (lat + "," + lng) : "36.2,127.9";
+      frame.src = "https://www.google.com/maps/d/embed?mid=" + encodeURIComponent(MY_MAPS_MID) +
+        "&hl=ko&ll=" + encodeURIComponent(ll) + "&z=" + z;
     }
 
     function haversineKm(aLat, aLng, bLat, bLng) {
@@ -594,11 +570,8 @@
     function focusSido(sido) {
       const shops = SHOPS.filter((s) => s.sido === sido);
       if (!shops.length) return;
-      if (shops.length === 1) {
-        map.setView([shops[0].lat, shops[0].lng], 15, { animate: true });
-        return;
-      }
-      map.fitBounds(L.latLngBounds(shops.map((s) => [s.lat, s.lng])).pad(0.28));
+      const zoom = shops.length === 1 ? 15 : 11;
+      showMap(shops[0].lat, shops[0].lng, zoom);
     }
 
     function copyText(text, btn, restoreLabel) {
@@ -698,10 +671,7 @@
       selectedId = id;
       const shop = SHOPS.find((s) => s.id === id);
       if (!shop) return;
-      refreshPinSelection();
-      map.setView([shop.lat, shop.lng], 15, { animate: true });
-      const marker = markers[id];
-      if (marker) marker.openPopup();
+      showMap(shop.lat, shop.lng, 15);
       renderList();
       if (fromList) return;
       const card = document.querySelector('.shop-card[data-id="' + id + '"]');
@@ -710,15 +680,10 @@
 
     function applyUserLocation(lat, lng, mapQ, hint) {
       userLatLng = { lat, lng };
-      if (userMarker) map.removeLayer(userMarker);
-      userMarker = L.marker([lat, lng], { icon: userDotIcon(), zIndexOffset: 1000 })
-        .addTo(map)
-        .bindPopup("내 위치");
       document.getElementById("locateBtn").classList.add("active");
       document.getElementById("locateBtn").textContent = "위치 켜짐";
       document.getElementById("sortHint").textContent = hint || "가까운 순으로 정렬됨";
-      const nearest = withDistance(SHOPS).sort((a, b) => a.km - b.km)[0];
-      map.fitBounds(L.latLngBounds([[lat, lng], [nearest.lat, nearest.lng]]).pad(0.35));
+      showMap(lat, lng, 14);
       renderList();
     }
 
@@ -830,21 +795,7 @@
       copyText(nearestCopyText(shops), e.currentTarget, "문자 복사");
     });
 
-    SHOPS.forEach((shop) => {
-      const marker = L.marker([shop.lat, shop.lng], { icon: pinIcon(shop.type, false) }).addTo(map);
-      marker.bindPopup(
-        `<strong>${shop.name}</strong><br>${shop.address}<br>` +
-        `<a href="${telHref(shop.phones[0])}">${shop.phones[0]}</a>`
-      );
-      marker.on("click", () => selectShop(shop.id, false));
-      markers[shop.id] = marker;
-    });
-
-    map.setView([36.2, 127.9], 7);
-    requestAnimationFrame(() => map.invalidateSize());
-    setTimeout(() => map.invalidateSize(), 120);
-    window.addEventListener("resize", () => map.invalidateSize());
-
+    showMap(36.2, 127.9, 7);
     renderList();
   </script>
 </body>
