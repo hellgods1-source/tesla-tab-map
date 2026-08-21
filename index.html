@@ -123,10 +123,14 @@
     .locate-btn:disabled { opacity: 0.65; cursor: wait; }
     .locate-btn.active { background: var(--ink); }
     .search-wrap {
-      display: flex;
+      display: grid;
+      grid-template-columns: 1fr;
       gap: 8px;
     }
-    #search {
+    @media (min-width: 768px) {
+      .search-wrap { grid-template-columns: 1fr 1fr auto; }
+    }
+    #search, #placeSearch {
       width: 100%;
       height: 40px;
       border: 1px solid var(--border);
@@ -136,9 +140,31 @@
       padding: 0 12px;
       font-size: 14px;
     }
-    #search::placeholder { color: var(--placeholder); }
-    #search:focus { outline: none; border-color: var(--blue); }
+    #search::placeholder, #placeSearch::placeholder { color: var(--placeholder); }
+    #search:focus, #placeSearch:focus { outline: none; border-color: var(--blue); }
+    .place-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 8px;
+    }
+    #placeBtn {
+      min-height: 40px;
+      padding: 0 14px;
+      border: 0;
+      border-radius: var(--radius);
+      background: var(--ink);
+      color: #fff;
+      font-weight: 500;
+      font-size: 14px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    #placeBtn:disabled { opacity: 0.65; cursor: wait; }
     .leaflet-container { background: var(--bg-soft); font-family: inherit; height: 100%; }
+    .leaflet-div-icon {
+      background: transparent;
+      border: none;
+    }
     .list-meta {
       display: flex;
       justify-content: space-between;
@@ -169,18 +195,18 @@
     .copy-btn {
       display: none;
       flex: 0 0 auto;
-      min-height: 32px;
-      padding: 0 12px;
-      border: 1px solid var(--border);
+      min-height: 36px;
+      padding: 0 14px;
+      border: 0;
       border-radius: var(--radius);
-      background: var(--bg);
-      color: var(--body);
+      background: var(--blue);
+      color: #fff;
       font-size: 13px;
       font-weight: 500;
       cursor: pointer;
     }
-    .copy-btn:hover { background: var(--bg-soft); }
-    .copy-btn.copied { border-color: var(--blue); color: var(--blue); }
+    .copy-btn:hover { background: var(--blue-hover); }
+    .copy-btn.copied { background: var(--ink); }
     .shop-card {
       display: grid;
       gap: 8px;
@@ -249,15 +275,37 @@
     }
     footer.note a { color: var(--body); }
     .pin {
-      width: 18px;
-      height: 18px;
+      width: 28px;
+      height: 28px;
       border-radius: 50% 50% 50% 0;
       transform: rotate(-45deg);
-      border: 2px solid #fff;
+      border: 2px solid #171A20;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .pin span {
+      transform: rotate(45deg);
+      color: #fff;
+      font-size: 11px;
+      font-weight: 500;
+      line-height: 1;
     }
     .pin.tesla { background: var(--blue); }
     .pin.tab { background: var(--ink); }
-    .pin-wrap { width: 22px; height: 28px; }
+    .pin-wrap { width: 32px; height: 40px; }
+    .pin-wrap.selected .pin {
+      box-shadow: 0 0 0 3px #fff, 0 0 0 6px var(--blue);
+    }
+    .user-dot {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: var(--blue);
+      border: 2px solid #fff;
+      box-shadow: 0 0 0 6px rgba(62, 106, 225, 0.28);
+    }
+    .user-dot-wrap { width: 26px; height: 26px; }
   </style>
 </head>
 <body>
@@ -271,7 +319,11 @@
         <button id="locateBtn" class="locate-btn" type="button">내 위치</button>
       </div>
       <div class="search-wrap">
-        <input id="search" type="search" placeholder="센터명 또는 지역 검색 (예: 분당, 부산)" autocomplete="off">
+        <input id="search" type="search" placeholder="센터명 검색 (예: 분당, 부산)" autocomplete="off">
+        <div class="place-row">
+          <input id="placeSearch" type="search" placeholder="내 위치 주소·지명 (예: 동탄, 강남구)" autocomplete="off">
+          <button id="placeBtn" type="button">찾기</button>
+        </div>
       </div>
     </header>
     <div class="stage">
@@ -343,14 +395,45 @@
     let selectedId = null;
     let userMarker = null;
 
-    function pinIcon(type) {
+    function pinIcon(type, selected) {
+      const label = type === "tesla" ? "직" : "공";
       return L.divIcon({
-        className: "pin-wrap",
-        html: `<div class="pin ${type}"></div>`,
-        iconSize: [22, 28],
-        iconAnchor: [11, 26],
-        popupAnchor: [0, -22]
+        className: "pin-wrap" + (selected ? " selected" : ""),
+        html: `<div class="pin ${type}"><span>${label}</span></div>`,
+        iconSize: [32, 40],
+        iconAnchor: [16, 38],
+        popupAnchor: [0, -30]
       });
+    }
+
+    function userDotIcon() {
+      return L.divIcon({
+        className: "user-dot-wrap",
+        html: '<div class="user-dot"></div>',
+        iconSize: [26, 26],
+        iconAnchor: [13, 13]
+      });
+    }
+
+    function refreshPinSelection() {
+      SHOPS.forEach((shop) => {
+        const marker = markers[shop.id];
+        if (marker) marker.setIcon(pinIcon(shop.type, shop.id === selectedId));
+      });
+    }
+
+    function applyUserLocation(lat, lng, hint) {
+      userLatLng = { lat, lng };
+      if (userMarker) map.removeLayer(userMarker);
+      userMarker = L.marker([lat, lng], { icon: userDotIcon(), zIndexOffset: 1000 })
+        .addTo(map)
+        .bindPopup("내 위치");
+      document.getElementById("locateBtn").classList.add("active");
+      document.getElementById("locateBtn").textContent = "위치 켜짐";
+      document.getElementById("sortHint").textContent = hint || "가까운 순으로 정렬됨";
+      const nearest = withDistance(SHOPS).sort((a, b) => a.km - b.km)[0];
+      map.fitBounds(L.latLngBounds([[lat, lng], [nearest.lat, nearest.lng]]).pad(0.35));
+      renderList();
     }
 
     function haversineKm(aLat, aLng, bLat, bLng) {
@@ -547,6 +630,7 @@
       selectedId = id;
       const shop = SHOPS.find((s) => s.id === id);
       if (!shop) return;
+      refreshPinSelection();
       const marker = markers[id];
       if (marker) {
         map.setView([shop.lat, shop.lng], Math.max(map.getZoom(), 13), { animate: true });
@@ -559,7 +643,7 @@
     }
 
     SHOPS.forEach((shop) => {
-      const marker = L.marker([shop.lat, shop.lng], { icon: pinIcon(shop.type) }).addTo(map);
+      const marker = L.marker([shop.lat, shop.lng], { icon: pinIcon(shop.type, false) }).addTo(map);
       marker.bindPopup(
         `<strong>${shop.name}</strong><br>${shop.address}<br>` +
         `<a href="${telHref(shop.phones[0])}">${shop.phones[0]}</a>`
@@ -578,33 +662,66 @@
     const locateBtn = document.getElementById("locateBtn");
     locateBtn.addEventListener("click", () => {
       if (!navigator.geolocation) {
-        document.getElementById("sortHint").textContent = "이 브라우저에서는 위치를 쓸 수 없습니다.";
+        document.getElementById("sortHint").textContent = "GPS를 쓸 수 없습니다. 주소로 찾아보세요.";
         return;
       }
       locateBtn.disabled = true;
       locateBtn.textContent = "확인 중…";
       navigator.geolocation.getCurrentPosition(
         (pos) => {
-          userLatLng = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-          if (userMarker) map.removeLayer(userMarker);
-          userMarker = L.circleMarker([userLatLng.lat, userLatLng.lng], {
-            radius: 8, color: "#fff", weight: 2, fillColor: "#3E6AE1", fillOpacity: 1
-          }).addTo(map).bindPopup("내 위치");
           locateBtn.disabled = false;
-          locateBtn.classList.add("active");
-          locateBtn.textContent = "위치 켜짐";
-          document.getElementById("sortHint").textContent = "가까운 순으로 정렬됨";
-          const nearest = withDistance(SHOPS).sort((a, b) => a.km - b.km)[0];
-          map.fitBounds(L.latLngBounds([[userLatLng.lat, userLatLng.lng], [nearest.lat, nearest.lng]]).pad(0.35));
-          renderList();
+          applyUserLocation(pos.coords.latitude, pos.coords.longitude, "가까운 순으로 정렬됨");
         },
         () => {
           locateBtn.disabled = false;
           locateBtn.textContent = "내 위치";
-          document.getElementById("sortHint").textContent = "위치 권한이 거부되었습니다. 검색으로 찾아보세요.";
+          document.getElementById("sortHint").textContent = "위치 권한이 거부되었습니다. 주소로 찾아보세요.";
         },
         { enableHighAccuracy: true, timeout: 12000, maximumAge: 60000 }
       );
+    });
+
+    async function findPlace() {
+      const q = (document.getElementById("placeSearch").value || "").trim();
+      const placeBtn = document.getElementById("placeBtn");
+      if (!q) {
+        document.getElementById("sortHint").textContent = "주소나 지명을 입력하세요.";
+        return;
+      }
+      placeBtn.disabled = true;
+      placeBtn.textContent = "찾는 중…";
+      try {
+        const url = "https://photon.komoot.io/api/?q=" + encodeURIComponent(q) +
+          "&lat=36.2&lon=127.9&limit=5";
+        const res = await fetch(url);
+        const data = await res.json();
+        const features = (data && data.features) || [];
+        const kr = features.find((f) => {
+          const c = (f.properties && f.properties.country) || "";
+          const cc = (f.properties && f.properties.countrycode) || "";
+          return c === "South Korea" || c === "대한민국" || cc === "KR";
+        }) || features[0];
+        if (!kr || !kr.geometry || !kr.geometry.coordinates) {
+          document.getElementById("sortHint").textContent = "위치를 찾지 못했습니다. 다른 지명을 입력하세요.";
+          return;
+        }
+        const lng = kr.geometry.coordinates[0];
+        const lat = kr.geometry.coordinates[1];
+        applyUserLocation(lat, lng, "입력 위치 기준 가까운 순");
+      } catch (e) {
+        document.getElementById("sortHint").textContent = "위치 검색에 실패했습니다. 잠시 후 다시 시도하세요.";
+      } finally {
+        placeBtn.disabled = false;
+        placeBtn.textContent = "찾기";
+      }
+    }
+
+    document.getElementById("placeBtn").addEventListener("click", findPlace);
+    document.getElementById("placeSearch").addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        findPlace();
+      }
     });
 
     renderList();
