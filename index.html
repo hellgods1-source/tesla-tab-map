@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#111111">
+  <meta name="description" content="Tesla 직영 사고수리센터 및 공인 바디샵을 지도에서 찾고, 가까운 센터를 선택하세요.">
+  <title>Tesla 공인 바디샵 찾기</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+  <style>
+    :root {
+      --bg: #111111;
+      --bg-elev: #1a1a1a;
+      --bg-card: #222222;
+      --line: #333333;
+      --text: #f4f4f4;
+      --muted: #a3a3a3;
+      --red: #e31937;
+      --red-soft: rgba(227, 25, 55, 0.16);
+      --tab: #c4c4c4;
+      --radius: 14px;
+      --safe-top: env(safe-area-inset-top, 0px);
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
+    }
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html, body { height: 100%; margin: 0; }
+    body {
+      font-family: "Tesla Sans", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      overflow: hidden;
+    }
+    .app {
+      height: 100%;
+      display: grid;
+      grid-template-rows: auto minmax(220px, 42vh) minmax(0, 1fr);
+    }
+    header {
+      padding: calc(10px + var(--safe-top)) 16px 12px;
+      background: var(--bg);
+      border-bottom: 1px solid var(--line);
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+    .brand h1 {
+      margin: 0;
+      font-size: 1.05rem;
+      font-weight: 650;
+      letter-spacing: -0.02em;
+    }
+    .brand p {
+      margin: 2px 0 0;
+      color: var(--muted);
+      font-size: 0.75rem;
+    }
+    .locate-btn {
+      flex: 0 0 auto;
+      height: 2.4rem;
+      padding: 0 12px;
+      border: 0;
+      border-radius: 999px;
+      background: var(--red);
+      color: #fff;
+      font-weight: 650;
+      font-size: 0.82rem;
+      cursor: pointer;
+    }
+    .locate-btn:disabled { opacity: 0.65; cursor: wait; }
+    .locate-btn.active { background: #1f7a46; }
+    .search-wrap {
+      display: flex;
+      gap: 8px;
+    }
+    #search {
+      width: 100%;
+      height: 2.4rem;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: var(--bg-elev);
+      color: var(--text);
+      padding: 0 12px;
+      font-size: 1rem;
+    }
+    #search::placeholder { color: #777; }
+    #map { width: 100%; background: #1c1c1c; }
+    .leaflet-container { background: #1c1c1c; font-family: inherit; }
+    .list-pane {
+      overflow: auto;
+      background: var(--bg);
+      padding: 10px 12px calc(18px + var(--safe-bottom));
+    }
+    .list-meta {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin: 2px 4px 10px;
+      color: var(--muted);
+      font-size: 0.78rem;
+    }
+    .shop-card {
+      display: grid;
+      gap: 8px;
+      padding: 12px;
+      margin-bottom: 8px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--bg-card);
+      cursor: pointer;
+    }
+    .shop-card.selected {
+      border-color: var(--red);
+      box-shadow: inset 0 0 0 1px var(--red);
+    }
+    .shop-top {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      align-items: flex-start;
+    }
+    .shop-name { font-weight: 650; font-size: 0.95rem; line-height: 1.3; }
+    .shop-area { color: var(--muted); font-size: 0.78rem; margin-top: 2px; }
+    .badge {
+      flex: 0 0 auto;
+      font-size: 0.68rem;
+      font-weight: 700;
+      padding: 3px 7px;
+      border-radius: 999px;
+      letter-spacing: 0.02em;
+    }
+    .badge.tesla { background: var(--red-soft); color: #ff6b7d; }
+    .badge.tab { background: #2a2a2a; color: var(--tab); }
+    .shop-addr { color: #d4d4d4; font-size: 0.82rem; line-height: 1.4; }
+    .shop-dist { color: var(--red); font-weight: 700; font-size: 0.82rem; }
+    .actions {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 6px;
+    }
+    .actions a {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 2.2rem;
+      border-radius: 10px;
+      text-decoration: none;
+      font-size: 0.78rem;
+      font-weight: 650;
+    }
+    .btn-call { background: var(--red); color: #fff; }
+    .btn-naver { background: #03c75a; color: #062; }
+    .btn-kakao { background: #fee500; color: #191919; }
+    .empty, .hint {
+      padding: 18px 8px;
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.86rem;
+    }
+    footer.note {
+      margin-top: 8px;
+      padding: 10px 6px 4px;
+      color: #888;
+      font-size: 0.72rem;
+      line-height: 1.5;
+      text-align: center;
+    }
+    footer.note a { color: #ccc; }
+    .pin {
+      width: 18px;
+      height: 18px;
+      border-radius: 50% 50% 50% 0;
+      transform: rotate(-45deg);
+      border: 2px solid #fff;
+      box-shadow: 0 1px 4px rgba(0,0,0,.45);
+    }
+    .pin.tesla { background: var(--red); }
+    .pin.tab { background: #111; }
+    .pin-wrap { width: 22px; height: 28px; }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <div class="brand">
+        <div>
+          <h1>Tesla 공인 바디샵 찾기</h1>
+          <p>직영 사고수리센터 · 공인 바디샵</p>
+        </div>
+        <button id="locateBtn" class="locate-btn" type="button">내 위치</button>
+      </div>
+      <div class="search-wrap">
+        <input id="search" type="search" placeholder="센터명 또는 지역 검색 (예: 분당, 부산)" autocomplete="off">
+      </div>
+    </header>
+    <div id="map" role="application" aria-label="바디샵 지도"></div>
+    <section class="list-pane">
+      <div class="list-meta">
+        <span id="listCount">21곳</span>
+        <span id="sortHint">가까운 순으로 보려면 내 위치를 켜세요</span>
+      </div>
+      <div id="list"></div>
+      <footer class="note">
+        공식 안내:
+        <a href="https://www.tesla.com/ko_kr/support/body-shop-support" target="_blank" rel="noopener">Tesla 공인 바디샵</a>
+        · 고객지원 <a href="tel:0806171399">080-617-1399</a><br>
+        위치는 안내 문자 주소 기준이며, 방문 전 센터에 예약·상담을 권장합니다.
+      </footer>
+    </section>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script>
+    const SHOPS = [
+      { id: "yongin", name: "Tesla 직영 사고수리센터 (용인)", area: "경기 용인", type: "tesla", address: "경기 용인시 기흥구 중부대로 14", phones: ["080-617-1399", "010-9894-0237"], lat: 37.276619, lng: 127.117136 },
+      { id: "dongtan", name: "Tesla 직영 사고수리센터 (동탄)", area: "경기 화성", type: "tesla", address: "경기도 화성시 경기동로 348", phones: ["080-617-1399", "010-9626-8237"], lat: 37.159011, lng: 127.096971 },
+      { id: "fmk-gangseo", name: "FMK (서울 강서)", area: "서울 강서", type: "tab", address: "서울시 강서구 양천로 66길 5", phones: ["02-6094-1200"], lat: 37.554224, lng: 126.865152 },
+      { id: "hanbul-seongdong", name: "한불모터스 (서울 성동)", area: "서울 성동", type: "tab", address: "서울시 성동구 광나루로 310", phones: ["02-462-3008"], lat: 37.547801, lng: 127.064457 },
+      { id: "hk-seocho", name: "HK모터스 (서울 서초)", area: "서울 서초", type: "tab", address: "서울특별시 서초구 성촌4길 19", phones: ["02-579-6361"], lat: 37.466888, lng: 127.02215 },
+      { id: "ym-hannam", name: "와이엠서비스 한남 (서울 용산)", area: "서울 용산", type: "tab", address: "서울 용산구 한남대로21길 23", phones: ["02-790-1173"], lat: 37.533932, lng: 127.006494 },
+      { id: "cheonwoo-ilsan", name: "천우 (고양 일산)", area: "경기 고양", type: "tab", address: "경기도 고양시 일산동구 백마로 512", phones: ["031-961-0602"], lat: 37.662714, lng: 126.804924 },
+      { id: "cheonwoo-bundang", name: "천우 (성남 분당)", area: "경기 성남 분당", type: "tab", address: "경기도 성남시 분당구 대왕판교로 316 지하 2층", phones: ["031-715-4200"], lat: 37.371849, lng: 127.102143 },
+      { id: "xile-anyang", name: "자일 서비스 (안양 평촌)", area: "경기 안양", type: "tab", address: "경기도 안양시 동안구 벌말로 40", phones: ["031-421-6020"], lat: 37.402879, lng: 126.972574 },
+      { id: "ym-incheon", name: "와이엠서비스 (인천 중구)", area: "인천 중구", type: "tab", address: "인천 중구 축항대로 291번길 10", phones: ["032-887-3007"], lat: 37.450207, lng: 126.628114 },
+      { id: "meister-bucheon", name: "마이스터모터스 서부 (부천)", area: "경기 부천", type: "tab", address: "경기도 부천시 원미구 도약로 271", phones: ["1544-2111"], lat: 37.511648, lng: 126.75892 },
+      { id: "xile-bundang", name: "자일 서비스 (분당)", area: "경기 성남 분당", type: "tab", address: "경기 성남시 분당구 대왕판교로 148", phones: ["031-780-6502"], lat: 37.392948, lng: 127.103886 },
+      { id: "central-suwon", name: "센트럴모터스 (수원)", area: "경기 수원", type: "tab", address: "경기 수원시 권선구 정조로 336", phones: ["031-292-1236"], lat: 37.237716, lng: 127.01785 },
+      { id: "central-wonju", name: "센트럴모터스 (원주)", area: "강원 원주", type: "tab", address: "강원도 원주시 정지길 3", phones: ["080-868-5100"], lat: 37.356496, lng: 127.949279 },
+      { id: "hyupsin-sasang", name: "협신 (부산 사상)", area: "부산 사상", type: "tab", address: "부산 사상구 가야대로 180", phones: ["051-311-7300"], lat: 35.15005, lng: 128.999322 },
+      { id: "hyupsin-yeonje", name: "협신 (부산 연제)", area: "부산 수영", type: "tab", address: "부산 수영구 좌수영로 210번길 18", phones: ["051-757-7310"], lat: 35.183579, lng: 129.115562 },
+      { id: "sungjin-gimhae", name: "성진정비 (김해)", area: "경남 김해", type: "tab", address: "경남 김해시 풍유동 1003-2", phones: ["055-716-8288"], lat: 35.21367, lng: 128.84709 },
+      { id: "ym-daegu", name: "와이엠서비스 (대구)", area: "대구 달서", type: "tab", address: "대구 달서구 성서4차첨단로 182", phones: ["053-580-7040"], lat: 35.82919, lng: 128.518434 },
+      { id: "s-gwangju", name: "S모터스 (광주)", area: "광주 광산", type: "tab", address: "광주광역시 광산구 어등대로 605", phones: ["062-460-1100"], lat: 35.142666, lng: 126.793098 },
+      { id: "js-daejeon", name: "JS모터스 (대전)", area: "대전 동구", type: "tab", address: "대전 동구 새울로 58", phones: ["042-284-4974"], lat: 36.320504, lng: 127.462393 },
+      { id: "cheonwoo-jeju", name: "천우 (제주)", area: "제주", type: "tab", address: "제주시 연삼로 759", phones: ["064-805-5222"], lat: 33.504136, lng: 126.550126 }
+    ];
+
+    const map = L.map("map", { zoomControl: true, attributionControl: true });
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19,
+      attribution: "&copy; OpenStreetMap"
+    }).addTo(map);
+
+    const markers = {};
+    let userLatLng = null;
+    let selectedId = null;
+    let userMarker = null;
+
+    function pinIcon(type) {
+      return L.divIcon({
+        className: "pin-wrap",
+        html: `<div class="pin ${type}"></div>`,
+        iconSize: [22, 28],
+        iconAnchor: [11, 26],
+        popupAnchor: [0, -22]
+      });
+    }
+
+    function haversineKm(aLat, aLng, bLat, bLng) {
+      const R = 6371;
+      const dLat = (bLat - aLat) * Math.PI / 180;
+      const dLng = (bLng - aLng) * Math.PI / 180;
+      const s = Math.sin(dLat / 2) ** 2 +
+        Math.cos(aLat * Math.PI / 180) * Math.cos(bLat * Math.PI / 180) *
+        Math.sin(dLng / 2) ** 2;
+      return 2 * R * Math.asin(Math.sqrt(s));
+    }
+
+    function telHref(phone) {
+      return "tel:" + phone.replace(/[^0-9+]/g, "");
+    }
+
+    function naverHref(shop) {
+      return "https://map.naver.com/p/search/" + encodeURIComponent(shop.address);
+    }
+
+    function kakaoHref(shop) {
+      return "https://map.kakao.com/link/to/" + encodeURIComponent(shop.name) + "," + shop.lat + "," + shop.lng;
+    }
+
+    function formatKm(km) {
+      if (km == null) return "";
+      return km < 10 ? km.toFixed(1) + " km" : Math.round(km) + " km";
+    }
+
+    function withDistance(shops) {
+      return shops.map((shop) => {
+        const km = userLatLng ? haversineKm(userLatLng.lat, userLatLng.lng, shop.lat, shop.lng) : null;
+        return Object.assign({}, shop, { km });
+      });
+    }
+
+    function filteredShops() {
+      const q = (document.getElementById("search").value || "").trim().toLowerCase().replace(/\s+/g, "");
+      let shops = withDistance(SHOPS);
+      if (q) {
+        shops = shops.filter((s) => {
+          const hay = (s.name + s.area + s.address).toLowerCase().replace(/\s+/g, "");
+          return hay.includes(q);
+        });
+      }
+      shops.sort((a, b) => {
+        if (a.km != null && b.km != null) return a.km - b.km;
+        if (a.type !== b.type) return a.type === "tesla" ? -1 : 1;
+        return a.name.localeCompare(b.name, "ko");
+      });
+      return shops;
+    }
+
+    function typeLabel(type) {
+      return type === "tesla" ? "직영" : "공인";
+    }
+
+    function renderList() {
+      const shops = filteredShops();
+      const list = document.getElementById("list");
+      document.getElementById("listCount").textContent = shops.length + "곳";
+      if (!shops.length) {
+        list.innerHTML = '<div class="empty">검색 결과가 없습니다.</div>';
+        return;
+      }
+      list.innerHTML = shops.map((shop) => `
+        <article class="shop-card${shop.id === selectedId ? " selected" : ""}" data-id="${shop.id}">
+          <div class="shop-top">
+            <div>
+              <div class="shop-name">${shop.name}</div>
+              <div class="shop-area">${shop.area}</div>
+            </div>
+            <span class="badge ${shop.type}">${typeLabel(shop.type)}</span>
+          </div>
+          <div class="shop-addr">${shop.address}</div>
+          ${shop.km != null ? `<div class="shop-dist">약 ${formatKm(shop.km)}</div>` : ""}
+          <div class="actions">
+            <a class="btn-call" href="${telHref(shop.phones[0])}">전화</a>
+            <a class="btn-naver" href="${naverHref(shop)}" target="_blank" rel="noopener">네이버</a>
+            <a class="btn-kakao" href="${kakaoHref(shop)}" target="_blank" rel="noopener">카카오맵</a>
+          </div>
+        </article>
+      `).join("");
+      list.querySelectorAll(".shop-card").forEach((card) => {
+        card.addEventListener("click", (e) => {
+          if (e.target.closest("a")) return;
+          selectShop(card.dataset.id, true);
+        });
+      });
+    }
+
+    function selectShop(id, fromList) {
+      selectedId = id;
+      const shop = SHOPS.find((s) => s.id === id);
+      if (!shop) return;
+      const marker = markers[id];
+      if (marker) {
+        map.setView([shop.lat, shop.lng], Math.max(map.getZoom(), 13), { animate: true });
+        marker.openPopup();
+      }
+      renderList();
+      if (fromList) return;
+      const card = document.querySelector('.shop-card[data-id="' + id + '"]');
+      if (card) card.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+
+    SHOPS.forEach((shop) => {
+      const marker = L.marker([shop.lat, shop.lng], { icon: pinIcon(shop.type) }).addTo(map);
+      marker.bindPopup(
+        `<strong>${shop.name}</strong><br>${shop.address}<br>` +
+        `<a href="${telHref(shop.phones[0])}">${shop.phones[0]}</a>`
+      );
+      marker.on("click", () => selectShop(shop.id, false));
+      markers[shop.id] = marker;
+    });
+
+    map.fitBounds(L.latLngBounds(SHOPS.map((s) => [s.lat, s.lng])).pad(0.12));
+
+    document.getElementById("search").addEventListener("input", renderList);
+
+    const locateBtn = document.getElementById("locateBtn");
+    locateBtn.addEventListener("click", () => {
+      if (!navigator.geolocation) {
+        document.getElementById("sortHint").textContent = "이 브라우저에서는 위치를 쓸 수 없습니다.";
+        return;
+      }
+      locateBtn.disabled = true;
+      locateBtn.textContent = "확인 중…";
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          userLatLng = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+          if (userMarker) map.removeLayer(userMarker);
+          userMarker = L.circleMarker([userLatLng.lat, userLatLng.lng], {
+            radius: 8, color: "#fff", weight: 2, fillColor: "#3b82f6", fillOpacity: 1
+          }).addTo(map).bindPopup("내 위치");
+          locateBtn.disabled = false;
+          locateBtn.classList.add("active");
+          locateBtn.textContent = "위치 켜짐";
+          document.getElementById("sortHint").textContent = "가까운 순으로 정렬됨";
+          const nearest = withDistance(SHOPS).sort((a, b) => a.km - b.km)[0];
+          map.fitBounds(L.latLngBounds([[userLatLng.lat, userLatLng.lng], [nearest.lat, nearest.lng]]).pad(0.35));
+          renderList();
+        },
+        () => {
+          locateBtn.disabled = false;
+          locateBtn.textContent = "내 위치";
+          document.getElementById("sortHint").textContent = "위치 권한이 거부되었습니다. 검색으로 찾아보세요.";
+        },
+        { enableHighAccuracy: true, timeout: 12000, maximumAge: 60000 }
+      );
+    });
+
+    renderList();
+  </script>
+</body>
+</html>
