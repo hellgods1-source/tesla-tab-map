@@ -9,7 +9,6 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
   <style>
     :root {
       --bg: #FFFFFF;
@@ -46,12 +45,19 @@
       display: flex;
       flex-direction: column;
     }
-    #map {
+    .map-pane {
       width: 100%;
       height: 42vh;
       min-height: 220px;
       flex: 0 0 42vh;
       background: var(--bg-soft);
+      position: relative;
+    }
+    #mapFrame {
+      width: 100%;
+      height: 100%;
+      border: 0;
+      display: block;
     }
     .list-pane {
       flex: 1 1 auto;
@@ -61,11 +67,8 @@
       padding: 12px 16px calc(20px + var(--safe-bottom));
     }
     @media (min-width: 768px) {
-      .stage {
-        flex-direction: row;
-        align-items: stretch;
-      }
-      #map {
+      .stage { flex-direction: row; align-items: stretch; }
+      .map-pane {
         flex: 1 1 0;
         width: auto;
         height: auto;
@@ -128,7 +131,7 @@
       gap: 8px;
     }
     @media (min-width: 768px) {
-      .search-wrap { grid-template-columns: 1fr 1fr auto; }
+      .search-wrap { grid-template-columns: 1fr 1fr; }
     }
     #search, #placeSearch {
       width: 100%;
@@ -160,11 +163,29 @@
       white-space: nowrap;
     }
     #placeBtn:disabled { opacity: 0.65; cursor: wait; }
-    .leaflet-container { background: var(--bg-soft); font-family: inherit; height: 100%; }
-    .leaflet-div-icon {
-      background: transparent;
-      border: none;
+    #placeCandidates {
+      display: none;
+      margin-top: 8px;
+      border: 1px solid var(--hairline);
+      border-radius: var(--radius);
+      overflow: hidden;
     }
+    #placeCandidates.open { display: block; }
+    .place-candidate {
+      display: block;
+      width: 100%;
+      text-align: left;
+      padding: 10px 12px;
+      border: 0;
+      border-bottom: 1px solid var(--hairline);
+      background: var(--bg);
+      color: var(--ink);
+      font-size: 13px;
+      cursor: pointer;
+    }
+    .place-candidate:last-child { border-bottom: 0; }
+    .place-candidate:hover { background: var(--bg-soft); }
+    .place-candidate small { display: block; color: var(--muted); margin-top: 2px; }
     .list-meta {
       display: flex;
       justify-content: space-between;
@@ -173,25 +194,32 @@
       color: var(--muted);
       font-size: 13px;
     }
+    .nearest-panel {
+      display: none;
+      margin-bottom: 16px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--hairline);
+    }
+    .nearest-panel.open { display: block; }
     .sido-group { margin-bottom: 8px; }
     .sido-group + .sido-group { border-top: 1px solid var(--hairline); padding-top: 14px; }
-    .sido-head {
+    .sido-head, .nearest-head {
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: 8px;
       margin: 0 0 10px;
       padding: 4px 0;
-      cursor: pointer;
     }
-    .sido-title {
+    .sido-head { cursor: pointer; }
+    .sido-title, .nearest-title {
       display: flex;
       align-items: baseline;
       gap: 8px;
       min-width: 0;
     }
-    .sido-title strong { font-size: 16px; font-weight: 500; color: var(--ink); }
-    .sido-title span { color: var(--muted); font-size: 13px; font-weight: 400; }
+    .sido-title strong, .nearest-title strong { font-size: 16px; font-weight: 500; color: var(--ink); }
+    .sido-title span, .nearest-title span { color: var(--muted); font-size: 13px; font-weight: 400; }
     .copy-btn {
       display: none;
       flex: 0 0 auto;
@@ -253,7 +281,7 @@
       font-weight: 500;
     }
     .btn-call { background: var(--blue); color: #fff; }
-    .btn-naver, .btn-kakao {
+    .btn-gmap, .btn-naver {
       background: var(--bg-soft);
       color: var(--body);
       border: 1px solid var(--hairline);
@@ -274,38 +302,6 @@
       border-top: 1px solid var(--hairline);
     }
     footer.note a { color: var(--body); }
-    .pin {
-      width: 28px;
-      height: 28px;
-      border-radius: 50% 50% 50% 0;
-      transform: rotate(-45deg);
-      border: 2px solid #171A20;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-    .pin span {
-      transform: rotate(45deg);
-      color: #fff;
-      font-size: 11px;
-      font-weight: 500;
-      line-height: 1;
-    }
-    .pin.tesla { background: var(--blue); }
-    .pin.tab { background: var(--ink); }
-    .pin-wrap { width: 32px; height: 40px; }
-    .pin-wrap.selected .pin {
-      box-shadow: 0 0 0 3px #fff, 0 0 0 6px var(--blue);
-    }
-    .user-dot {
-      width: 14px;
-      height: 14px;
-      border-radius: 50%;
-      background: var(--blue);
-      border: 2px solid #fff;
-      box-shadow: 0 0 0 6px rgba(62, 106, 225, 0.28);
-    }
-    .user-dot-wrap { width: 26px; height: 26px; }
   </style>
 </head>
 <body>
@@ -320,31 +316,45 @@
       </div>
       <div class="search-wrap">
         <input id="search" type="search" placeholder="센터명 검색 (예: 분당, 부산)" autocomplete="off">
-        <div class="place-row">
-          <input id="placeSearch" type="search" placeholder="내 위치 주소·지명 (예: 동탄, 강남구)" autocomplete="off">
-          <button id="placeBtn" type="button">찾기</button>
+        <div>
+          <div class="place-row">
+            <input id="placeSearch" type="search" placeholder="내 위치 주소·지명 (예: 동탄, 강남구)" autocomplete="off">
+            <button id="placeBtn" type="button">찾기</button>
+          </div>
+          <div id="placeCandidates"></div>
         </div>
       </div>
     </header>
     <div class="stage">
-    <div id="map" role="application" aria-label="바디샵 지도"></div>
-    <section class="list-pane">
-      <div class="list-meta">
-        <span id="listCount">21곳</span>
-        <span id="sortHint">가까운 순으로 보려면 내 위치를 켜세요</span>
+      <div class="map-pane">
+        <iframe id="mapFrame" title="구글 지도" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
       </div>
-      <div id="list"></div>
-      <footer class="note">
-        공식 안내:
-        <a href="https://www.tesla.com/ko_kr/support/body-shop-support" target="_blank" rel="noopener">Tesla 공인 바디샵</a>
-        · 고객지원 <a href="tel:0806171399">080-617-1399</a><br>
-        위치는 안내 문자 주소 기준이며, 방문 전 센터에 예약·상담을 권장합니다.
-      </footer>
-    </section>
+      <section class="list-pane">
+        <div class="list-meta">
+          <span id="listCount">21곳</span>
+          <span id="sortHint">가까운 순으로 보려면 내 위치를 켜세요</span>
+        </div>
+        <div id="nearestPanel" class="nearest-panel">
+          <div class="nearest-head">
+            <div class="nearest-title">
+              <strong>가까운 센터 5곳</strong>
+              <span>거리순</span>
+            </div>
+            <button id="nearestCopyBtn" class="copy-btn" type="button">문자 복사</button>
+          </div>
+          <div id="nearestList"></div>
+        </div>
+        <div id="list"></div>
+        <footer class="note">
+          공식 안내:
+          <a href="https://www.tesla.com/ko_kr/support/body-shop-support" target="_blank" rel="noopener">Tesla 공인 바디샵</a>
+          · 고객지원 <a href="tel:0806171399">080-617-1399</a><br>
+          위치는 안내 문자 주소 기준이며, 방문 전 센터에 예약·상담을 권장합니다.
+        </footer>
+      </section>
     </div>
   </div>
 
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   <script>
     const SIDO_ORDER = ["서울", "경기", "인천", "강원", "대전", "대구", "광주", "부산", "경남", "제주"];
     const SIDO_LABEL = {
@@ -359,81 +369,46 @@
       "경남": "경상남도",
       "제주": "제주특별자치도"
     };
+    const KOREA_BBOX = "124.5,33.0,132.0,38.9";
 
     const SHOPS = [
       { id: "yongin", name: "Tesla 직영 사고수리센터 (용인)", area: "경기 용인", sido: "경기", type: "tesla", address: "경기 용인시 기흥구 중부대로 14", phones: ["080-617-1399", "010-9894-0237"], lat: 37.276619, lng: 127.117136 },
-      { id: "dongtan", name: "Tesla 직영 사고수리센터 (동탄)", area: "경기 화성", sido: "경기", type: "tesla", address: "경기도 화성시 경기동로 348", phones: ["080-617-1399", "010-9626-8237"], lat: 37.159011, lng: 127.096971 },
+      { id: "dongtan", name: "Tesla 직영 사고수리센터 (동탄)", area: "경기 화성", sido: "경기", type: "tesla", address: "경기도 화성시 경기동로 348", phones: ["080-617-1399", "010-9626-8237"], lat: 37.154519, lng: 127.111760 },
       { id: "fmk-gangseo", name: "FMK (서울 강서)", area: "서울 강서", sido: "서울", type: "tab", address: "서울시 강서구 양천로 66길 5", phones: ["02-6094-1200"], lat: 37.554224, lng: 126.865152 },
       { id: "hanbul-seongdong", name: "한불모터스 (서울 성동)", area: "서울 성동", sido: "서울", type: "tab", address: "서울시 성동구 광나루로 310", phones: ["02-462-3008"], lat: 37.547801, lng: 127.064457 },
-      { id: "hk-seocho", name: "HK모터스 (서울 서초)", area: "서울 서초", sido: "서울", type: "tab", address: "서울특별시 서초구 성촌4길 19", phones: ["02-579-6361"], lat: 37.466888, lng: 127.02215 },
+      { id: "hk-seocho", name: "HK모터스 (서울 서초)", area: "서울 서초", sido: "서울", type: "tab", address: "서울특별시 서초구 성촌4길 19", phones: ["02-579-6361"], lat: 37.46715, lng: 127.021999 },
       { id: "ym-hannam", name: "와이엠서비스 한남 (서울 용산)", area: "서울 용산", sido: "서울", type: "tab", address: "서울 용산구 한남대로21길 23", phones: ["02-790-1173"], lat: 37.533932, lng: 127.006494 },
       { id: "cheonwoo-ilsan", name: "천우 (고양 일산)", area: "경기 고양", sido: "경기", type: "tab", address: "경기도 고양시 일산동구 백마로 512", phones: ["031-961-0602"], lat: 37.662714, lng: 126.804924 },
       { id: "cheonwoo-bundang", name: "천우 (성남 분당)", area: "경기 성남 분당", sido: "경기", type: "tab", address: "경기도 성남시 분당구 대왕판교로 316 지하 2층", phones: ["031-715-4200"], lat: 37.371849, lng: 127.102143 },
       { id: "xile-anyang", name: "자일 서비스 (안양 평촌)", area: "경기 안양", sido: "경기", type: "tab", address: "경기도 안양시 동안구 벌말로 40", phones: ["031-421-6020"], lat: 37.402879, lng: 126.972574 },
       { id: "ym-incheon", name: "와이엠서비스 (인천 중구)", area: "인천 중구", sido: "인천", type: "tab", address: "인천 중구 축항대로 291번길 10", phones: ["032-887-3007"], lat: 37.450207, lng: 126.628114 },
-      { id: "meister-bucheon", name: "마이스터모터스 서부 (부천)", area: "경기 부천", sido: "경기", type: "tab", address: "경기도 부천시 원미구 도약로 271", phones: ["1544-2111"], lat: 37.511648, lng: 126.75892 },
+      { id: "meister-bucheon", name: "마이스터모터스 서부 (부천)", area: "경기 부천", sido: "경기", type: "tab", address: "경기도 부천시 원미구 도약로 271", phones: ["1544-2111"], lat: 37.508689, lng: 126.784561 },
       { id: "xile-bundang", name: "자일 서비스 (분당)", area: "경기 성남 분당", sido: "경기", type: "tab", address: "경기 성남시 분당구 대왕판교로 148", phones: ["031-780-6502"], lat: 37.392948, lng: 127.103886 },
-      { id: "central-suwon", name: "센트럴모터스 (수원)", area: "경기 수원", sido: "경기", type: "tab", address: "경기 수원시 권선구 정조로 336", phones: ["031-292-1236"], lat: 37.237716, lng: 127.01785 },
+      { id: "central-suwon", name: "센트럴모터스 (수원)", area: "경기 수원", sido: "경기", type: "tab", address: "경기 수원시 권선구 정조로 336", phones: ["031-292-1236"], lat: 37.242352, lng: 127.015802 },
       { id: "central-wonju", name: "센트럴모터스 (원주)", area: "강원 원주", sido: "강원", type: "tab", address: "강원도 원주시 정지길 3", phones: ["080-868-5100"], lat: 37.356496, lng: 127.949279 },
-      { id: "hyupsin-sasang", name: "협신 (부산 사상)", area: "부산 사상", sido: "부산", type: "tab", address: "부산 사상구 가야대로 180", phones: ["051-311-7300"], lat: 35.15005, lng: 128.999322 },
+      { id: "hyupsin-sasang", name: "협신 (부산 사상)", area: "부산 사상", sido: "부산", type: "tab", address: "부산 사상구 가야대로 180", phones: ["051-311-7300"], lat: 35.147062, lng: 128.991154 },
       { id: "hyupsin-yeonje", name: "협신 (부산 연제)", area: "부산 수영", sido: "부산", type: "tab", address: "부산 수영구 좌수영로 210번길 18", phones: ["051-757-7310"], lat: 35.183579, lng: 129.115562 },
       { id: "sungjin-gimhae", name: "성진정비 (김해)", area: "경남 김해", sido: "경남", type: "tab", address: "경남 김해시 풍유동 1003-2", phones: ["055-716-8288"], lat: 35.21367, lng: 128.84709 },
       { id: "ym-daegu", name: "와이엠서비스 (대구)", area: "대구 달서", sido: "대구", type: "tab", address: "대구 달서구 성서4차첨단로 182", phones: ["053-580-7040"], lat: 35.82919, lng: 128.518434 },
-      { id: "s-gwangju", name: "S모터스 (광주)", area: "광주 광산", sido: "광주", type: "tab", address: "광주광역시 광산구 어등대로 605", phones: ["062-460-1100"], lat: 35.142666, lng: 126.793098 },
-      { id: "js-daejeon", name: "JS모터스 (대전)", area: "대전 동구", sido: "대전", type: "tab", address: "대전 동구 새울로 58", phones: ["042-284-4974"], lat: 36.320504, lng: 127.462393 },
-      { id: "cheonwoo-jeju", name: "천우 (제주)", area: "제주", sido: "제주", type: "tab", address: "제주시 연삼로 759", phones: ["064-805-5222"], lat: 33.504136, lng: 126.550126 }
+      { id: "s-gwangju", name: "S모터스 (광주)", area: "광주 광산", sido: "광주", type: "tab", address: "광주광역시 광산구 어등대로 605", phones: ["062-460-1100"], lat: 35.150099, lng: 126.79006 },
+      { id: "js-daejeon", name: "JS모터스 (대전)", area: "대전 동구", sido: "대전", type: "tab", address: "대전 동구 새울로 58", phones: ["042-284-4974"], lat: 36.323955, lng: 127.460377 },
+      { id: "cheonwoo-jeju", name: "천우 (제주)", area: "제주", sido: "제주", type: "tab", address: "제주시 연삼로 759", phones: ["064-805-5222"], lat: 33.519604, lng: 126.596332 }
     ];
 
-    const map = L.map("map", { zoomControl: true, attributionControl: true });
-    L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
-      maxZoom: 19,
-      attribution: "&copy; OpenStreetMap &copy; CARTO"
-    }).addTo(map);
-
-    const markers = {};
     let userLatLng = null;
     let selectedId = null;
-    let userMarker = null;
+    let mapQuery = "대한민국";
+    let mapZoom = 7;
 
-    function pinIcon(type, selected) {
-      const label = type === "tesla" ? "직" : "공";
-      return L.divIcon({
-        className: "pin-wrap" + (selected ? " selected" : ""),
-        html: `<div class="pin ${type}"><span>${label}</span></div>`,
-        iconSize: [32, 40],
-        iconAnchor: [16, 38],
-        popupAnchor: [0, -30]
-      });
+    function googleEmbedSrc(query, zoom) {
+      return "https://maps.google.com/maps?q=" + encodeURIComponent(query) +
+        "&hl=ko&z=" + (zoom || 15) + "&output=embed";
     }
 
-    function userDotIcon() {
-      return L.divIcon({
-        className: "user-dot-wrap",
-        html: '<div class="user-dot"></div>',
-        iconSize: [26, 26],
-        iconAnchor: [13, 13]
-      });
-    }
-
-    function refreshPinSelection() {
-      SHOPS.forEach((shop) => {
-        const marker = markers[shop.id];
-        if (marker) marker.setIcon(pinIcon(shop.type, shop.id === selectedId));
-      });
-    }
-
-    function applyUserLocation(lat, lng, hint) {
-      userLatLng = { lat, lng };
-      if (userMarker) map.removeLayer(userMarker);
-      userMarker = L.marker([lat, lng], { icon: userDotIcon(), zIndexOffset: 1000 })
-        .addTo(map)
-        .bindPopup("내 위치");
-      document.getElementById("locateBtn").classList.add("active");
-      document.getElementById("locateBtn").textContent = "위치 켜짐";
-      document.getElementById("sortHint").textContent = hint || "가까운 순으로 정렬됨";
-      const nearest = withDistance(SHOPS).sort((a, b) => a.km - b.km)[0];
-      map.fitBounds(L.latLngBounds([[lat, lng], [nearest.lat, nearest.lng]]).pad(0.35));
-      renderList();
+    function showMap(query, zoom) {
+      mapQuery = query;
+      mapZoom = zoom || 15;
+      document.getElementById("mapFrame").src = googleEmbedSrc(mapQuery, mapZoom);
     }
 
     function haversineKm(aLat, aLng, bLat, bLng) {
@@ -454,8 +429,8 @@
       return "https://map.naver.com/p/search/" + encodeURIComponent(shop.address);
     }
 
-    function kakaoHref(shop) {
-      return "https://map.kakao.com/link/to/" + encodeURIComponent(shop.name) + "," + shop.lat + "," + shop.lng;
+    function googleHref(shop) {
+      return "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(shop.name + " " + shop.address);
     }
 
     function formatKm(km) {
@@ -512,6 +487,11 @@
       }));
     }
 
+    function nearestFive() {
+      if (!userLatLng) return [];
+      return withDistance(SHOPS).sort((a, b) => a.km - b.km).slice(0, 5);
+    }
+
     function typeLabel(type) {
       return type === "tesla" ? "직영" : "공인";
     }
@@ -530,8 +510,8 @@
           ${shop.km != null ? `<div class="shop-dist">약 ${formatKm(shop.km)}</div>` : ""}
           <div class="actions">
             <a class="btn-call" href="${telHref(shop.phones[0])}">전화</a>
+            <a class="btn-gmap" href="${googleHref(shop)}" target="_blank" rel="noopener">구글맵</a>
             <a class="btn-naver" href="${naverHref(shop)}" target="_blank" rel="noopener">네이버</a>
-            <a class="btn-kakao" href="${kakaoHref(shop)}" target="_blank" rel="noopener">카카오맵</a>
           </div>
         </article>
       `;
@@ -544,25 +524,26 @@
       return "[" + group.label + "]\n" + body;
     }
 
+    function nearestCopyText(shops) {
+      const body = shops.map((shop, i) =>
+        (i + 1) + ". " + shop.name + " · 약 " + formatKm(shop.km) + "\n" +
+        shop.address + "\n" + shop.phones.join(" / ")
+      ).join("\n\n");
+      return "가까운 Tesla 공인 바디샵\n\n" + body;
+    }
+
     function focusSido(sido) {
       const shops = SHOPS.filter((s) => s.sido === sido);
       if (!shops.length) return;
-      if (shops.length === 1) {
-        map.setView([shops[0].lat, shops[0].lng], 12, { animate: true });
-        return;
-      }
-      map.fitBounds(L.latLngBounds(shops.map((s) => [s.lat, s.lng])).pad(0.28));
+      showMap(SIDO_LABEL[sido] + " " + shops[0].address, shops.length === 1 ? 15 : 11);
     }
 
-    function copySido(sido, btn) {
-      const shops = sortShopsInSido(withDistance(SHOPS.filter((s) => s.sido === sido)));
-      const group = { sido, label: SIDO_LABEL[sido] || sido, shops };
-      const text = sidoCopyText(group);
+    function copyText(text, btn, restoreLabel) {
       const done = () => {
         btn.textContent = "복사됨";
         btn.classList.add("copied");
         setTimeout(() => {
-          btn.textContent = "문자 복사";
+          btn.textContent = restoreLabel;
           btn.classList.remove("copied");
         }, 1600);
       };
@@ -585,11 +566,35 @@
       document.body.removeChild(ta);
     }
 
+    function copySido(sido, btn) {
+      const shops = sortShopsInSido(withDistance(SHOPS.filter((s) => s.sido === sido)));
+      const group = { sido, label: SIDO_LABEL[sido] || sido, shops };
+      copyText(sidoCopyText(group), btn, "문자 복사");
+    }
+
+    function renderNearest() {
+      const panel = document.getElementById("nearestPanel");
+      const shops = nearestFive();
+      if (!shops.length) {
+        panel.classList.remove("open");
+        return;
+      }
+      panel.classList.add("open");
+      document.getElementById("nearestList").innerHTML = shops.map(shopCardHtml).join("");
+      document.getElementById("nearestList").querySelectorAll(".shop-card").forEach((card) => {
+        card.addEventListener("click", (e) => {
+          if (e.target.closest("a")) return;
+          selectShop(card.dataset.id, true);
+        });
+      });
+    }
+
     function renderList() {
       const groups = groupedShops();
       const list = document.getElementById("list");
       const total = groups.reduce((n, g) => n + g.shops.length, 0);
       document.getElementById("listCount").textContent = total + "곳";
+      renderNearest();
       if (!total) {
         list.innerHTML = '<div class="empty">검색 결과가 없습니다.</div>';
         return;
@@ -630,32 +635,60 @@
       selectedId = id;
       const shop = SHOPS.find((s) => s.id === id);
       if (!shop) return;
-      refreshPinSelection();
-      const marker = markers[id];
-      if (marker) {
-        map.setView([shop.lat, shop.lng], Math.max(map.getZoom(), 13), { animate: true });
-        marker.openPopup();
-      }
+      showMap(shop.name + " " + shop.address, 16);
       renderList();
       if (fromList) return;
       const card = document.querySelector('.shop-card[data-id="' + id + '"]');
       if (card) card.scrollIntoView({ behavior: "smooth", block: "nearest" });
     }
 
-    SHOPS.forEach((shop) => {
-      const marker = L.marker([shop.lat, shop.lng], { icon: pinIcon(shop.type, false) }).addTo(map);
-      marker.bindPopup(
-        `<strong>${shop.name}</strong><br>${shop.address}<br>` +
-        `<a href="${telHref(shop.phones[0])}">${shop.phones[0]}</a>`
-      );
-      marker.on("click", () => selectShop(shop.id, false));
-      markers[shop.id] = marker;
-    });
+    function applyUserLocation(lat, lng, mapQ, hint) {
+      userLatLng = { lat, lng };
+      document.getElementById("locateBtn").classList.add("active");
+      document.getElementById("locateBtn").textContent = "위치 켜짐";
+      document.getElementById("sortHint").textContent = hint || "가까운 순으로 정렬됨";
+      showMap(mapQ || (lat + "," + lng), 14);
+      renderList();
+    }
 
-    map.setView([36.2, 127.9], 7);
-    requestAnimationFrame(() => map.invalidateSize());
-    setTimeout(() => map.invalidateSize(), 120);
-    window.addEventListener("resize", () => map.invalidateSize());
+    function hideCandidates() {
+      const box = document.getElementById("placeCandidates");
+      box.classList.remove("open");
+      box.innerHTML = "";
+    }
+
+    function candidateLabel(props) {
+      const parts = [props.name, props.district, props.city, props.county, props.state].filter(Boolean);
+      const unique = [];
+      parts.forEach((p) => { if (unique.indexOf(p) === -1) unique.push(p); });
+      return unique.join(" · ") || "위치";
+    }
+
+    function isKorea(props) {
+      const c = (props && props.country) || "";
+      const cc = (props && props.countrycode) || "";
+      return c === "South Korea" || c === "대한민국" || cc === "KR" || cc === "kr";
+    }
+
+    function showCandidates(features) {
+      const box = document.getElementById("placeCandidates");
+      box.innerHTML = features.map((f, i) => {
+        const label = candidateLabel(f.properties || {});
+        const extra = [(f.properties || {}).street, (f.properties || {}).postcode].filter(Boolean).join(" ");
+        return `<button class="place-candidate" type="button" data-i="${i}"><span>${label}</span>${extra ? "<small>" + extra + "</small>" : ""}</button>`;
+      }).join("");
+      box.classList.add("open");
+      box.querySelectorAll(".place-candidate").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const f = features[Number(btn.dataset.i)];
+          const lng = f.geometry.coordinates[0];
+          const lat = f.geometry.coordinates[1];
+          const q = candidateLabel(f.properties || {}) || (lat + "," + lng);
+          hideCandidates();
+          applyUserLocation(lat, lng, q, "입력 위치 기준 가까운 순");
+        });
+      });
+    }
 
     document.getElementById("search").addEventListener("input", renderList);
 
@@ -670,7 +703,7 @@
       navigator.geolocation.getCurrentPosition(
         (pos) => {
           locateBtn.disabled = false;
-          applyUserLocation(pos.coords.latitude, pos.coords.longitude, "가까운 순으로 정렬됨");
+          applyUserLocation(pos.coords.latitude, pos.coords.longitude, pos.coords.latitude + "," + pos.coords.longitude, "가까운 순으로 정렬됨");
         },
         () => {
           locateBtn.disabled = false;
@@ -690,24 +723,21 @@
       }
       placeBtn.disabled = true;
       placeBtn.textContent = "찾는 중…";
+      hideCandidates();
       try {
-        const url = "https://photon.komoot.io/api/?q=" + encodeURIComponent(q) +
-          "&lat=36.2&lon=127.9&limit=5";
+        const url = "https://photon.komoot.io/api/?q=" + encodeURIComponent(q + " 대한민국") +
+          "&lat=36.2&lon=127.9&limit=8&bbox=" + KOREA_BBOX;
         const res = await fetch(url);
         const data = await res.json();
-        const features = (data && data.features) || [];
-        const kr = features.find((f) => {
-          const c = (f.properties && f.properties.country) || "";
-          const cc = (f.properties && f.properties.countrycode) || "";
-          return c === "South Korea" || c === "대한민국" || cc === "KR";
-        }) || features[0];
-        if (!kr || !kr.geometry || !kr.geometry.coordinates) {
+        const features = ((data && data.features) || []).filter((f) => f.geometry && f.geometry.coordinates);
+        const kr = features.filter((f) => isKorea(f.properties)).slice(0, 5);
+        const picks = kr.length ? kr : features.slice(0, 5);
+        if (!picks.length) {
           document.getElementById("sortHint").textContent = "위치를 찾지 못했습니다. 다른 지명을 입력하세요.";
           return;
         }
-        const lng = kr.geometry.coordinates[0];
-        const lat = kr.geometry.coordinates[1];
-        applyUserLocation(lat, lng, "입력 위치 기준 가까운 순");
+        showCandidates(picks);
+        document.getElementById("sortHint").textContent = "검색 결과에서 위치를 선택하세요.";
       } catch (e) {
         document.getElementById("sortHint").textContent = "위치 검색에 실패했습니다. 잠시 후 다시 시도하세요.";
       } finally {
@@ -723,7 +753,13 @@
         findPlace();
       }
     });
+    document.getElementById("nearestCopyBtn").addEventListener("click", (e) => {
+      const shops = nearestFive();
+      if (!shops.length) return;
+      copyText(nearestCopyText(shops), e.currentTarget, "문자 복사");
+    });
 
+    showMap("대한민국", 7);
     renderList();
   </script>
 </body>
