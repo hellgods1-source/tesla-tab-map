@@ -35,6 +35,15 @@
       display: grid;
       grid-template-rows: auto minmax(220px, 42vh) minmax(0, 1fr);
     }
+    @media (min-width: 900px) {
+      .app {
+        grid-template-columns: minmax(0, 1fr) 380px;
+        grid-template-rows: auto minmax(0, 1fr);
+      }
+      header { grid-column: 1 / -1; }
+      #map { min-height: 0; height: 100%; }
+      .list-pane { border-left: 1px solid var(--line); }
+    }
     header {
       padding: calc(10px + var(--safe-top)) 16px 12px;
       background: var(--bg);
@@ -101,6 +110,41 @@
       margin: 2px 4px 10px;
       color: var(--muted);
       font-size: 0.78rem;
+    }
+    .sido-group { margin-bottom: 14px; }
+    .sido-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin: 4px 2px 8px;
+      padding: 0 2px;
+      cursor: pointer;
+    }
+    .sido-title {
+      display: flex;
+      align-items: baseline;
+      gap: 6px;
+      min-width: 0;
+    }
+    .sido-title strong { font-size: 0.92rem; font-weight: 700; }
+    .sido-title span { color: var(--muted); font-size: 0.75rem; }
+    .copy-btn {
+      display: none;
+      flex: 0 0 auto;
+      height: 1.85rem;
+      padding: 0 10px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: var(--bg-elev);
+      color: var(--text);
+      font-size: 0.72rem;
+      font-weight: 650;
+      cursor: pointer;
+    }
+    .copy-btn.copied { border-color: #1f7a46; color: #7dcea0; }
+    @media (min-width: 900px) {
+      .copy-btn { display: inline-flex; align-items: center; }
     }
     .shop-card {
       display: grid;
@@ -214,28 +258,42 @@
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   <script>
+    const SIDO_ORDER = ["서울", "경기", "인천", "강원", "대전", "대구", "광주", "부산", "경남", "제주"];
+    const SIDO_LABEL = {
+      "서울": "서울특별시",
+      "경기": "경기도",
+      "인천": "인천광역시",
+      "강원": "강원특별자치도",
+      "대전": "대전광역시",
+      "대구": "대구광역시",
+      "광주": "광주광역시",
+      "부산": "부산광역시",
+      "경남": "경상남도",
+      "제주": "제주특별자치도"
+    };
+
     const SHOPS = [
-      { id: "yongin", name: "Tesla 직영 사고수리센터 (용인)", area: "경기 용인", type: "tesla", address: "경기 용인시 기흥구 중부대로 14", phones: ["080-617-1399", "010-9894-0237"], lat: 37.276619, lng: 127.117136 },
-      { id: "dongtan", name: "Tesla 직영 사고수리센터 (동탄)", area: "경기 화성", type: "tesla", address: "경기도 화성시 경기동로 348", phones: ["080-617-1399", "010-9626-8237"], lat: 37.159011, lng: 127.096971 },
-      { id: "fmk-gangseo", name: "FMK (서울 강서)", area: "서울 강서", type: "tab", address: "서울시 강서구 양천로 66길 5", phones: ["02-6094-1200"], lat: 37.554224, lng: 126.865152 },
-      { id: "hanbul-seongdong", name: "한불모터스 (서울 성동)", area: "서울 성동", type: "tab", address: "서울시 성동구 광나루로 310", phones: ["02-462-3008"], lat: 37.547801, lng: 127.064457 },
-      { id: "hk-seocho", name: "HK모터스 (서울 서초)", area: "서울 서초", type: "tab", address: "서울특별시 서초구 성촌4길 19", phones: ["02-579-6361"], lat: 37.466888, lng: 127.02215 },
-      { id: "ym-hannam", name: "와이엠서비스 한남 (서울 용산)", area: "서울 용산", type: "tab", address: "서울 용산구 한남대로21길 23", phones: ["02-790-1173"], lat: 37.533932, lng: 127.006494 },
-      { id: "cheonwoo-ilsan", name: "천우 (고양 일산)", area: "경기 고양", type: "tab", address: "경기도 고양시 일산동구 백마로 512", phones: ["031-961-0602"], lat: 37.662714, lng: 126.804924 },
-      { id: "cheonwoo-bundang", name: "천우 (성남 분당)", area: "경기 성남 분당", type: "tab", address: "경기도 성남시 분당구 대왕판교로 316 지하 2층", phones: ["031-715-4200"], lat: 37.371849, lng: 127.102143 },
-      { id: "xile-anyang", name: "자일 서비스 (안양 평촌)", area: "경기 안양", type: "tab", address: "경기도 안양시 동안구 벌말로 40", phones: ["031-421-6020"], lat: 37.402879, lng: 126.972574 },
-      { id: "ym-incheon", name: "와이엠서비스 (인천 중구)", area: "인천 중구", type: "tab", address: "인천 중구 축항대로 291번길 10", phones: ["032-887-3007"], lat: 37.450207, lng: 126.628114 },
-      { id: "meister-bucheon", name: "마이스터모터스 서부 (부천)", area: "경기 부천", type: "tab", address: "경기도 부천시 원미구 도약로 271", phones: ["1544-2111"], lat: 37.511648, lng: 126.75892 },
-      { id: "xile-bundang", name: "자일 서비스 (분당)", area: "경기 성남 분당", type: "tab", address: "경기 성남시 분당구 대왕판교로 148", phones: ["031-780-6502"], lat: 37.392948, lng: 127.103886 },
-      { id: "central-suwon", name: "센트럴모터스 (수원)", area: "경기 수원", type: "tab", address: "경기 수원시 권선구 정조로 336", phones: ["031-292-1236"], lat: 37.237716, lng: 127.01785 },
-      { id: "central-wonju", name: "센트럴모터스 (원주)", area: "강원 원주", type: "tab", address: "강원도 원주시 정지길 3", phones: ["080-868-5100"], lat: 37.356496, lng: 127.949279 },
-      { id: "hyupsin-sasang", name: "협신 (부산 사상)", area: "부산 사상", type: "tab", address: "부산 사상구 가야대로 180", phones: ["051-311-7300"], lat: 35.15005, lng: 128.999322 },
-      { id: "hyupsin-yeonje", name: "협신 (부산 연제)", area: "부산 수영", type: "tab", address: "부산 수영구 좌수영로 210번길 18", phones: ["051-757-7310"], lat: 35.183579, lng: 129.115562 },
-      { id: "sungjin-gimhae", name: "성진정비 (김해)", area: "경남 김해", type: "tab", address: "경남 김해시 풍유동 1003-2", phones: ["055-716-8288"], lat: 35.21367, lng: 128.84709 },
-      { id: "ym-daegu", name: "와이엠서비스 (대구)", area: "대구 달서", type: "tab", address: "대구 달서구 성서4차첨단로 182", phones: ["053-580-7040"], lat: 35.82919, lng: 128.518434 },
-      { id: "s-gwangju", name: "S모터스 (광주)", area: "광주 광산", type: "tab", address: "광주광역시 광산구 어등대로 605", phones: ["062-460-1100"], lat: 35.142666, lng: 126.793098 },
-      { id: "js-daejeon", name: "JS모터스 (대전)", area: "대전 동구", type: "tab", address: "대전 동구 새울로 58", phones: ["042-284-4974"], lat: 36.320504, lng: 127.462393 },
-      { id: "cheonwoo-jeju", name: "천우 (제주)", area: "제주", type: "tab", address: "제주시 연삼로 759", phones: ["064-805-5222"], lat: 33.504136, lng: 126.550126 }
+      { id: "yongin", name: "Tesla 직영 사고수리센터 (용인)", area: "경기 용인", sido: "경기", type: "tesla", address: "경기 용인시 기흥구 중부대로 14", phones: ["080-617-1399", "010-9894-0237"], lat: 37.276619, lng: 127.117136 },
+      { id: "dongtan", name: "Tesla 직영 사고수리센터 (동탄)", area: "경기 화성", sido: "경기", type: "tesla", address: "경기도 화성시 경기동로 348", phones: ["080-617-1399", "010-9626-8237"], lat: 37.159011, lng: 127.096971 },
+      { id: "fmk-gangseo", name: "FMK (서울 강서)", area: "서울 강서", sido: "서울", type: "tab", address: "서울시 강서구 양천로 66길 5", phones: ["02-6094-1200"], lat: 37.554224, lng: 126.865152 },
+      { id: "hanbul-seongdong", name: "한불모터스 (서울 성동)", area: "서울 성동", sido: "서울", type: "tab", address: "서울시 성동구 광나루로 310", phones: ["02-462-3008"], lat: 37.547801, lng: 127.064457 },
+      { id: "hk-seocho", name: "HK모터스 (서울 서초)", area: "서울 서초", sido: "서울", type: "tab", address: "서울특별시 서초구 성촌4길 19", phones: ["02-579-6361"], lat: 37.466888, lng: 127.02215 },
+      { id: "ym-hannam", name: "와이엠서비스 한남 (서울 용산)", area: "서울 용산", sido: "서울", type: "tab", address: "서울 용산구 한남대로21길 23", phones: ["02-790-1173"], lat: 37.533932, lng: 127.006494 },
+      { id: "cheonwoo-ilsan", name: "천우 (고양 일산)", area: "경기 고양", sido: "경기", type: "tab", address: "경기도 고양시 일산동구 백마로 512", phones: ["031-961-0602"], lat: 37.662714, lng: 126.804924 },
+      { id: "cheonwoo-bundang", name: "천우 (성남 분당)", area: "경기 성남 분당", sido: "경기", type: "tab", address: "경기도 성남시 분당구 대왕판교로 316 지하 2층", phones: ["031-715-4200"], lat: 37.371849, lng: 127.102143 },
+      { id: "xile-anyang", name: "자일 서비스 (안양 평촌)", area: "경기 안양", sido: "경기", type: "tab", address: "경기도 안양시 동안구 벌말로 40", phones: ["031-421-6020"], lat: 37.402879, lng: 126.972574 },
+      { id: "ym-incheon", name: "와이엠서비스 (인천 중구)", area: "인천 중구", sido: "인천", type: "tab", address: "인천 중구 축항대로 291번길 10", phones: ["032-887-3007"], lat: 37.450207, lng: 126.628114 },
+      { id: "meister-bucheon", name: "마이스터모터스 서부 (부천)", area: "경기 부천", sido: "경기", type: "tab", address: "경기도 부천시 원미구 도약로 271", phones: ["1544-2111"], lat: 37.511648, lng: 126.75892 },
+      { id: "xile-bundang", name: "자일 서비스 (분당)", area: "경기 성남 분당", sido: "경기", type: "tab", address: "경기 성남시 분당구 대왕판교로 148", phones: ["031-780-6502"], lat: 37.392948, lng: 127.103886 },
+      { id: "central-suwon", name: "센트럴모터스 (수원)", area: "경기 수원", sido: "경기", type: "tab", address: "경기 수원시 권선구 정조로 336", phones: ["031-292-1236"], lat: 37.237716, lng: 127.01785 },
+      { id: "central-wonju", name: "센트럴모터스 (원주)", area: "강원 원주", sido: "강원", type: "tab", address: "강원도 원주시 정지길 3", phones: ["080-868-5100"], lat: 37.356496, lng: 127.949279 },
+      { id: "hyupsin-sasang", name: "협신 (부산 사상)", area: "부산 사상", sido: "부산", type: "tab", address: "부산 사상구 가야대로 180", phones: ["051-311-7300"], lat: 35.15005, lng: 128.999322 },
+      { id: "hyupsin-yeonje", name: "협신 (부산 연제)", area: "부산 수영", sido: "부산", type: "tab", address: "부산 수영구 좌수영로 210번길 18", phones: ["051-757-7310"], lat: 35.183579, lng: 129.115562 },
+      { id: "sungjin-gimhae", name: "성진정비 (김해)", area: "경남 김해", sido: "경남", type: "tab", address: "경남 김해시 풍유동 1003-2", phones: ["055-716-8288"], lat: 35.21367, lng: 128.84709 },
+      { id: "ym-daegu", name: "와이엠서비스 (대구)", area: "대구 달서", sido: "대구", type: "tab", address: "대구 달서구 성서4차첨단로 182", phones: ["053-580-7040"], lat: 35.82919, lng: 128.518434 },
+      { id: "s-gwangju", name: "S모터스 (광주)", area: "광주 광산", sido: "광주", type: "tab", address: "광주광역시 광산구 어등대로 605", phones: ["062-460-1100"], lat: 35.142666, lng: 126.793098 },
+      { id: "js-daejeon", name: "JS모터스 (대전)", area: "대전 동구", sido: "대전", type: "tab", address: "대전 동구 새울로 58", phones: ["042-284-4974"], lat: 36.320504, lng: 127.462393 },
+      { id: "cheonwoo-jeju", name: "천우 (제주)", area: "제주", sido: "제주", type: "tab", address: "제주시 연삼로 759", phones: ["064-805-5222"], lat: 33.504136, lng: 126.550126 }
     ];
 
     const map = L.map("map", { zoomControl: true, attributionControl: true });
@@ -293,36 +351,54 @@
       });
     }
 
+    function shopSearchHay(shop) {
+      return (shop.name + shop.area + shop.address + shop.sido + (SIDO_LABEL[shop.sido] || "")).toLowerCase().replace(/\s+/g, "");
+    }
+
     function filteredShops() {
       const q = (document.getElementById("search").value || "").trim().toLowerCase().replace(/\s+/g, "");
       let shops = withDistance(SHOPS);
-      if (q) {
-        shops = shops.filter((s) => {
-          const hay = (s.name + s.area + s.address).toLowerCase().replace(/\s+/g, "");
-          return hay.includes(q);
-        });
-      }
-      shops.sort((a, b) => {
+      if (q) shops = shops.filter((s) => shopSearchHay(s).includes(q));
+      return shops;
+    }
+
+    function sortShopsInSido(shops) {
+      return shops.slice().sort((a, b) => {
         if (a.km != null && b.km != null) return a.km - b.km;
         if (a.type !== b.type) return a.type === "tesla" ? -1 : 1;
         return a.name.localeCompare(b.name, "ko");
       });
-      return shops;
+    }
+
+    function groupedShops() {
+      const shops = filteredShops();
+      const bySido = {};
+      shops.forEach((shop) => {
+        if (!bySido[shop.sido]) bySido[shop.sido] = [];
+        bySido[shop.sido].push(shop);
+      });
+      const keys = Object.keys(bySido);
+      keys.sort((a, b) => {
+        if (userLatLng) {
+          const aMin = Math.min.apply(null, bySido[a].map((s) => s.km));
+          const bMin = Math.min.apply(null, bySido[b].map((s) => s.km));
+          return aMin - bMin;
+        }
+        return SIDO_ORDER.indexOf(a) - SIDO_ORDER.indexOf(b);
+      });
+      return keys.map((sido) => ({
+        sido,
+        label: SIDO_LABEL[sido] || sido,
+        shops: sortShopsInSido(bySido[sido])
+      }));
     }
 
     function typeLabel(type) {
       return type === "tesla" ? "직영" : "공인";
     }
 
-    function renderList() {
-      const shops = filteredShops();
-      const list = document.getElementById("list");
-      document.getElementById("listCount").textContent = shops.length + "곳";
-      if (!shops.length) {
-        list.innerHTML = '<div class="empty">검색 결과가 없습니다.</div>';
-        return;
-      }
-      list.innerHTML = shops.map((shop) => `
+    function shopCardHtml(shop) {
+      return `
         <article class="shop-card${shop.id === selectedId ? " selected" : ""}" data-id="${shop.id}">
           <div class="shop-top">
             <div>
@@ -339,11 +415,94 @@
             <a class="btn-kakao" href="${kakaoHref(shop)}" target="_blank" rel="noopener">카카오맵</a>
           </div>
         </article>
+      `;
+    }
+
+    function sidoCopyText(group) {
+      const body = group.shops.map((shop) =>
+        shop.name + "\n" + shop.address + "\n" + shop.phones.join(" / ")
+      ).join("\n\n");
+      return "[" + group.label + "]\n" + body;
+    }
+
+    function focusSido(sido) {
+      const shops = SHOPS.filter((s) => s.sido === sido);
+      if (!shops.length) return;
+      if (shops.length === 1) {
+        map.setView([shops[0].lat, shops[0].lng], 12, { animate: true });
+        return;
+      }
+      map.fitBounds(L.latLngBounds(shops.map((s) => [s.lat, s.lng])).pad(0.28));
+    }
+
+    function copySido(sido, btn) {
+      const shops = sortShopsInSido(withDistance(SHOPS.filter((s) => s.sido === sido)));
+      const group = { sido, label: SIDO_LABEL[sido] || sido, shops };
+      const text = sidoCopyText(group);
+      const done = () => {
+        btn.textContent = "복사됨";
+        btn.classList.add("copied");
+        setTimeout(() => {
+          btn.textContent = "복사";
+          btn.classList.remove("copied");
+        }, 1600);
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(done).catch(() => fallbackCopy(text, done));
+      } else {
+        fallbackCopy(text, done);
+      }
+    }
+
+    function fallbackCopy(text, done) {
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.setAttribute("readonly", "");
+      ta.style.position = "fixed";
+      ta.style.left = "-9999px";
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand("copy"); done(); } catch (e) {}
+      document.body.removeChild(ta);
+    }
+
+    function renderList() {
+      const groups = groupedShops();
+      const list = document.getElementById("list");
+      const total = groups.reduce((n, g) => n + g.shops.length, 0);
+      document.getElementById("listCount").textContent = total + "곳";
+      if (!total) {
+        list.innerHTML = '<div class="empty">검색 결과가 없습니다.</div>';
+        return;
+      }
+      list.innerHTML = groups.map((group) => `
+        <section class="sido-group" data-sido="${group.sido}">
+          <div class="sido-head">
+            <div class="sido-title">
+              <strong>${group.label}</strong>
+              <span>${group.shops.length}곳</span>
+            </div>
+            <button class="copy-btn" type="button" data-copy-sido="${group.sido}">복사</button>
+          </div>
+          ${group.shops.map(shopCardHtml).join("")}
+        </section>
       `).join("");
       list.querySelectorAll(".shop-card").forEach((card) => {
         card.addEventListener("click", (e) => {
           if (e.target.closest("a")) return;
           selectShop(card.dataset.id, true);
+        });
+      });
+      list.querySelectorAll(".sido-head").forEach((head) => {
+        head.addEventListener("click", (e) => {
+          if (e.target.closest(".copy-btn")) return;
+          focusSido(head.parentElement.dataset.sido);
+        });
+      });
+      list.querySelectorAll(".copy-btn").forEach((btn) => {
+        btn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          copySido(btn.dataset.copySido, btn);
         });
       });
     }
@@ -373,7 +532,9 @@
       markers[shop.id] = marker;
     });
 
-    map.fitBounds(L.latLngBounds(SHOPS.map((s) => [s.lat, s.lng])).pad(0.12));
+    map.setView([36.2, 127.9], 7);
+    setTimeout(() => map.invalidateSize(), 0);
+    window.addEventListener("resize", () => map.invalidateSize());
 
     document.getElementById("search").addEventListener("input", renderList);
 
