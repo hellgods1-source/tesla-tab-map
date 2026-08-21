@@ -9,6 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
   <style>
     :root {
       --bg: #FFFFFF;
@@ -53,11 +54,14 @@
       background: var(--bg-soft);
       position: relative;
     }
-    #mapFrame {
+    #map {
       width: 100%;
       height: 100%;
-      border: 0;
-      display: block;
+    }
+    .leaflet-container { background: var(--bg-soft); font-family: inherit; height: 100%; }
+    .leaflet-div-icon {
+      background: transparent;
+      border: none;
     }
     .list-pane {
       flex: 1 1 auto;
@@ -302,6 +306,38 @@
       border-top: 1px solid var(--hairline);
     }
     footer.note a { color: var(--body); }
+    .pin {
+      width: 28px;
+      height: 28px;
+      border-radius: 50% 50% 50% 0;
+      transform: rotate(-45deg);
+      border: 2px solid #171A20;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .pin span {
+      transform: rotate(45deg);
+      color: #fff;
+      font-size: 11px;
+      font-weight: 500;
+      line-height: 1;
+    }
+    .pin.tesla { background: var(--blue); }
+    .pin.tab { background: var(--ink); }
+    .pin-wrap { width: 32px; height: 40px; }
+    .pin-wrap.selected .pin {
+      box-shadow: 0 0 0 3px #fff, 0 0 0 6px var(--blue);
+    }
+    .user-dot {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: var(--blue);
+      border: 2px solid #fff;
+      box-shadow: 0 0 0 6px rgba(62, 106, 225, 0.28);
+    }
+    .user-dot-wrap { width: 26px; height: 26px; }
   </style>
 </head>
 <body>
@@ -327,7 +363,7 @@
     </header>
     <div class="stage">
       <div class="map-pane">
-        <iframe id="mapFrame" title="구글 지도" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
+        <div id="map" role="application" aria-label="바디샵 지도"></div>
       </div>
       <section class="list-pane">
         <div class="list-meta">
@@ -355,6 +391,7 @@
     </div>
   </div>
 
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   <script>
     const SIDO_ORDER = ["서울", "경기", "인천", "강원", "대전", "대구", "광주", "부산", "경남", "제주"];
     const SIDO_LABEL = {
@@ -395,20 +432,42 @@
       { id: "cheonwoo-jeju", name: "천우 (제주)", area: "제주", sido: "제주", type: "tab", address: "제주시 연삼로 759", phones: ["064-805-5222"], lat: 33.519604, lng: 126.596332 }
     ];
 
+    const map = L.map("map", { zoomControl: true, attributionControl: true });
+    L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
+      maxZoom: 19,
+      attribution: "&copy; OpenStreetMap &copy; CARTO"
+    }).addTo(map);
+
+    const markers = {};
     let userLatLng = null;
     let selectedId = null;
-    let mapQuery = "대한민국";
-    let mapZoom = 7;
+    let userMarker = null;
 
-    function googleEmbedSrc(query, zoom) {
-      return "https://maps.google.com/maps?q=" + encodeURIComponent(query) +
-        "&hl=ko&z=" + (zoom || 15) + "&output=embed";
+    function pinIcon(type, selected) {
+      const label = type === "tesla" ? "직" : "공";
+      return L.divIcon({
+        className: "pin-wrap" + (selected ? " selected" : ""),
+        html: `<div class="pin ${type}"><span>${label}</span></div>`,
+        iconSize: [32, 40],
+        iconAnchor: [16, 38],
+        popupAnchor: [0, -30]
+      });
     }
 
-    function showMap(query, zoom) {
-      mapQuery = query;
-      mapZoom = zoom || 15;
-      document.getElementById("mapFrame").src = googleEmbedSrc(mapQuery, mapZoom);
+    function userDotIcon() {
+      return L.divIcon({
+        className: "user-dot-wrap",
+        html: '<div class="user-dot"></div>',
+        iconSize: [26, 26],
+        iconAnchor: [13, 13]
+      });
+    }
+
+    function refreshPinSelection() {
+      SHOPS.forEach((shop) => {
+        const marker = markers[shop.id];
+        if (marker) marker.setIcon(pinIcon(shop.type, shop.id === selectedId));
+      });
     }
 
     function haversineKm(aLat, aLng, bLat, bLng) {
@@ -535,7 +594,11 @@
     function focusSido(sido) {
       const shops = SHOPS.filter((s) => s.sido === sido);
       if (!shops.length) return;
-      showMap(SIDO_LABEL[sido] + " " + shops[0].address, shops.length === 1 ? 15 : 11);
+      if (shops.length === 1) {
+        map.setView([shops[0].lat, shops[0].lng], 15, { animate: true });
+        return;
+      }
+      map.fitBounds(L.latLngBounds(shops.map((s) => [s.lat, s.lng])).pad(0.28));
     }
 
     function copyText(text, btn, restoreLabel) {
@@ -635,7 +698,10 @@
       selectedId = id;
       const shop = SHOPS.find((s) => s.id === id);
       if (!shop) return;
-      showMap(shop.name + " " + shop.address, 16);
+      refreshPinSelection();
+      map.setView([shop.lat, shop.lng], 15, { animate: true });
+      const marker = markers[id];
+      if (marker) marker.openPopup();
       renderList();
       if (fromList) return;
       const card = document.querySelector('.shop-card[data-id="' + id + '"]');
@@ -644,10 +710,15 @@
 
     function applyUserLocation(lat, lng, mapQ, hint) {
       userLatLng = { lat, lng };
+      if (userMarker) map.removeLayer(userMarker);
+      userMarker = L.marker([lat, lng], { icon: userDotIcon(), zIndexOffset: 1000 })
+        .addTo(map)
+        .bindPopup("내 위치");
       document.getElementById("locateBtn").classList.add("active");
       document.getElementById("locateBtn").textContent = "위치 켜짐";
       document.getElementById("sortHint").textContent = hint || "가까운 순으로 정렬됨";
-      showMap(mapQ || (lat + "," + lng), 14);
+      const nearest = withDistance(SHOPS).sort((a, b) => a.km - b.km)[0];
+      map.fitBounds(L.latLngBounds([[lat, lng], [nearest.lat, nearest.lng]]).pad(0.35));
       renderList();
     }
 
@@ -685,7 +756,7 @@
           const lat = f.geometry.coordinates[1];
           const q = candidateLabel(f.properties || {}) || (lat + "," + lng);
           hideCandidates();
-          applyUserLocation(lat, lng, q, "입력 위치 기준 가까운 순");
+          applyUserLocation(lat, lng, null, "입력 위치 기준 가까운 순");
         });
       });
     }
@@ -703,7 +774,7 @@
       navigator.geolocation.getCurrentPosition(
         (pos) => {
           locateBtn.disabled = false;
-          applyUserLocation(pos.coords.latitude, pos.coords.longitude, pos.coords.latitude + "," + pos.coords.longitude, "가까운 순으로 정렬됨");
+          applyUserLocation(pos.coords.latitude, pos.coords.longitude, null, "가까운 순으로 정렬됨");
         },
         () => {
           locateBtn.disabled = false;
@@ -759,7 +830,21 @@
       copyText(nearestCopyText(shops), e.currentTarget, "문자 복사");
     });
 
-    showMap("대한민국", 7);
+    SHOPS.forEach((shop) => {
+      const marker = L.marker([shop.lat, shop.lng], { icon: pinIcon(shop.type, false) }).addTo(map);
+      marker.bindPopup(
+        `<strong>${shop.name}</strong><br>${shop.address}<br>` +
+        `<a href="${telHref(shop.phones[0])}">${shop.phones[0]}</a>`
+      );
+      marker.on("click", () => selectShop(shop.id, false));
+      markers[shop.id] = marker;
+    });
+
+    map.setView([36.2, 127.9], 7);
+    requestAnimationFrame(() => map.invalidateSize());
+    setTimeout(() => map.invalidateSize(), 120);
+    window.addEventListener("resize", () => map.invalidateSize());
+
     renderList();
   </script>
 </body>
