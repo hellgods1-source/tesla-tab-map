@@ -23,7 +23,7 @@
       --safe-bottom: env(safe-area-inset-bottom, 0px);
     }
     * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-    html, body { height: 100%; margin: 0; }
+    html, body { height: 100%; width: 100%; margin: 0; }
     body {
       font-family: "Tesla Sans", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       background: var(--bg);
@@ -32,19 +32,51 @@
     }
     .app {
       height: 100%;
-      display: grid;
-      grid-template-rows: auto minmax(220px, 42vh) minmax(0, 1fr);
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
     }
-    @media (min-width: 900px) {
-      .app {
-        grid-template-columns: minmax(0, 1fr) 380px;
-        grid-template-rows: auto minmax(0, 1fr);
+    .stage {
+      flex: 1 1 auto;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+    }
+    #map {
+      width: 100%;
+      height: 42vh;
+      min-height: 220px;
+      flex: 0 0 42vh;
+      background: #1c1c1c;
+    }
+    .list-pane {
+      flex: 1 1 auto;
+      min-height: 0;
+      overflow: auto;
+      background: var(--bg);
+      padding: 10px 12px calc(18px + var(--safe-bottom));
+    }
+    @media (min-width: 768px) {
+      .stage {
+        flex-direction: row;
+        align-items: stretch;
       }
-      header { grid-column: 1 / -1; }
-      #map { min-height: 0; height: 100%; }
-      .list-pane { border-left: 1px solid var(--line); }
+      #map {
+        flex: 1 1 0;
+        width: auto;
+        height: auto;
+        min-height: 0;
+      }
+      .list-pane {
+        flex: 0 0 400px;
+        width: 400px;
+        max-width: 42vw;
+        border-left: 1px solid var(--line);
+      }
+      .copy-btn { display: inline-flex; align-items: center; }
     }
     header {
+      flex: 0 0 auto;
       padding: calc(10px + var(--safe-top)) 16px 12px;
       background: var(--bg);
       border-bottom: 1px solid var(--line);
@@ -96,13 +128,7 @@
       font-size: 1rem;
     }
     #search::placeholder { color: #777; }
-    #map { width: 100%; background: #1c1c1c; }
-    .leaflet-container { background: #1c1c1c; font-family: inherit; }
-    .list-pane {
-      overflow: auto;
-      background: var(--bg);
-      padding: 10px 12px calc(18px + var(--safe-bottom));
-    }
+    .leaflet-container { background: #1c1c1c; font-family: inherit; height: 100%; }
     .list-meta {
       display: flex;
       justify-content: space-between;
@@ -143,9 +169,6 @@
       cursor: pointer;
     }
     .copy-btn.copied { border-color: #1f7a46; color: #7dcea0; }
-    @media (min-width: 900px) {
-      .copy-btn { display: inline-flex; align-items: center; }
-    }
     .shop-card {
       display: grid;
       gap: 8px;
@@ -240,6 +263,7 @@
         <input id="search" type="search" placeholder="센터명 또는 지역 검색 (예: 분당, 부산)" autocomplete="off">
       </div>
     </header>
+    <div class="stage">
     <div id="map" role="application" aria-label="바디샵 지도"></div>
     <section class="list-pane">
       <div class="list-meta">
@@ -254,6 +278,7 @@
         위치는 안내 문자 주소 기준이며, 방문 전 센터에 예약·상담을 권장합니다.
       </footer>
     </section>
+    </div>
   </div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
@@ -533,7 +558,8 @@
     });
 
     map.setView([36.2, 127.9], 7);
-    setTimeout(() => map.invalidateSize(), 0);
+    requestAnimationFrame(() => map.invalidateSize());
+    setTimeout(() => map.invalidateSize(), 120);
     window.addEventListener("resize", () => map.invalidateSize());
 
     document.getElementById("search").addEventListener("input", renderList);
