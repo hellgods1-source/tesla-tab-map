@@ -3,7 +3,7 @@
 FOH 고객응대용 단독 HTML입니다.  
 **공유는 링크만 보내면 됩니다.** Chrome/Edge에서 바로 열립니다.
 
-https://hellgods1-source.github.io/tesla-tab-map/
+https://hellgods1-source.github.io/tesla-tab-map/?v=20260824
 
 로컬에서 볼 때는 `사고수리센터_안내.html` 또는 `index.html`을 브라우저로 엽니다.
 
@@ -20,7 +20,7 @@ https://hellgods1-source.github.io/tesla-tab-map/
 
 링크만 보냅니다.
 
-https://hellgods1-source.github.io/tesla-tab-map/
+https://hellgods1-source.github.io/tesla-tab-map/?v=20260824
 
 하지 말 것: OneDrive HTML 미리보기, Teams/메일 내장 뷰어. 스크립트가 막혀 지도가 안 뜹니다.
 
