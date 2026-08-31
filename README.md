@@ -3,7 +3,7 @@
 FOH 고객응대용 단독 HTML입니다.  
 **공유는 링크만 보내면 됩니다.** Chrome/Edge에서 바로 열립니다.
 
-https://hellgods1-source.github.io/tesla-tab-map/?v=20260824b
+https://hellgods1-source.github.io/tesla-tab-map/?v=20260824c
 
 로컬에서 볼 때는 `사고수리센터_안내.html` 또는 `index.html`을 브라우저로 엽니다.
 
@@ -11,7 +11,7 @@ https://hellgods1-source.github.io/tesla-tab-map/?v=20260824b
 
 1. 위 링크를 Chrome/Edge로 엽니다. (OneDrive·Teams 미리보기는 쓰지 않습니다)
 2. **고객 위치 주소·지명**을 입력하고 찾기 → 후보를 고르거나, **내 위치**를 켭니다.
-3. **가까운 센터 5곳**(100km 이내) → `문자 복사` → 상담 문자에 붙여 넣습니다.
+3. **가까운 센터 5곳**(100km 이내) → `근처 복사` → 상담 문자에 붙여 넣습니다.
 4. 전국이 필요하면 **전국 복사**를 씁니다.
 
 주소 검색만 네트워크가 필요합니다. GPS는 HTTPS(또는 localhost)에서만 동작합니다.
@@ -20,7 +20,7 @@ https://hellgods1-source.github.io/tesla-tab-map/?v=20260824b
 
 링크만 보냅니다.
 
-https://hellgods1-source.github.io/tesla-tab-map/?v=20260824b
+https://hellgods1-source.github.io/tesla-tab-map/?v=20260824c
 
 하지 말 것: OneDrive HTML 미리보기, Teams/메일 내장 뷰어. 스크립트가 막혀 지도가 안 뜹니다.
 
