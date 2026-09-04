@@ -3,7 +3,7 @@
 FOH 고객응대용 단독 HTML입니다.  
 **공유는 링크만 보내면 됩니다.** Chrome/Edge에서 바로 열립니다.
 
-https://hellgods1-source.github.io/tesla-tab-map/?v=20260824c
+https://hellgods1-source.github.io/tesla-tab-map/?v=20260831
 
 로컬에서 볼 때는 `사고수리센터_안내.html` 또는 `index.html`을 브라우저로 엽니다.
 
@@ -20,13 +20,13 @@ https://hellgods1-source.github.io/tesla-tab-map/?v=20260824c
 
 링크만 보냅니다.
 
-https://hellgods1-source.github.io/tesla-tab-map/?v=20260824c
+https://hellgods1-source.github.io/tesla-tab-map/?v=20260831
 
 하지 말 것: OneDrive HTML 미리보기, Teams/메일 내장 뷰어. 스크립트가 막혀 지도가 안 뜹니다.
 
 ## 문자에 포함되는 안내
 
-근거리 `문자 복사` 하단에 보험 참고와 공통 푸터가 붙습니다.
+근거리 `근처 복사` 하단에 보험 참고와 공통 푸터가 붙습니다.
 
 ```
 보험 견인 참고: 기본 10km · EV 특약 100km
@@ -43,13 +43,14 @@ https://hellgods1-source.github.io/tesla-tab-map/?v=20260824c
 - PC: 왼쪽 Leaflet 지도(전국 핀), 오른쪽 센터 정보
 - 위치 있음: 100km 이내 가까운 5곳. 100km 초과는 근거리 정리에서 제외
 - 위치 없음: 시도별 그룹 (복사 버튼 없음)
-- 복사 버튼: 근거리 `문자 복사`, `전국 복사`만
+- 복사 버튼: `근처 복사`, `전국 복사`만
+- 전국 복사: 서울, 경기, 인천, 원주, 대전, 대구, 부산, 광주, 김해, 제주 순
 - 뱃지: 직영 / 추천 / 공인 (현재 목록은 직영 2 · 공인 19. 추천은 공식 확인 후 넣음)
 - 헤더: 버전(제작·배포일) · 목록: 데이터 날짜 · 푸터: 최근 변경 한 줄
 
 ## 데이터
 
-- 버전(`APP_VERSION`): **2026.08.22** — 이 HTML 제작·배포일 (헤더)
+- 버전(`APP_VERSION`): **2026.08.31** — 이 HTML 제작·배포일 (헤더)
 - 데이터(`DATA_AS_OF`): **2026.08.22** — 센터 목록·좌표 갱신일 (목록)
 - 변경 기록(`CHANGELOG`): 푸터에 최근 한 줄
 - 출처: 고객지원 안내 문자 병합 21곳. Tesla 공식 로케이터 실시간 연동은 하지 않습니다.
